@@ -421,7 +421,9 @@ def get_stack_repair_dataset(
 if __name__ == "__main__":
     import sys, os, argparse
     from datasets import Dataset
-
+    
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+    from src.utils.llm import LLM  # we can not import from a module as a module
     
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Process The Stack dataset to create docstring-based code tasks")
@@ -429,6 +431,11 @@ if __name__ == "__main__":
     parser.add_argument("--min-docstring-length", type=int, default=50, help="Minimum docstring length")
     parser.add_argument("--push-to-hub", action="store_true", help="Push dataset to HuggingFace Hub")
     parser.add_argument("--sample-tasks", type=int, default=3, help="Number of sample tasks to display")
+    parser.add_argument("--llm-provider", type=str, default="anthropic", choices=["anthropic", "openrouter"], 
+                        help="LLM API provider (anthropic or openrouter)")
+    parser.add_argument("--llm-model", type=str, default="claude-3-5-haiku-latest", 
+                        help="Model ID to use for instruction prompt generation")
+    parser.add_argument("--llm-batch-size", type=int, default=10, help="Batch size for LLM API requests")
     args = parser.parse_args()
     
     # Set parameters
@@ -480,6 +487,7 @@ function that has been replaced with a comment. The model is provided with:
 1. The full file context with the function replaced by a comment
 2. The docstring of the function
 3. The function name
+4. An LLM-generated instruction prompt
 
 The model's task is to generate code that replaces the comment with a proper implementation
 of the function based on the docstring and surrounding context.
@@ -493,6 +501,7 @@ Each sample contains:
 - `start_line`: The starting line number of the function in the original file
 - `end_line`: The ending line number of the function in the original file
 - `file_content`: The full original file content
+- `instruction_prompt`: LLM-generated instruction prompt combining docstring and code context
 
 ## Quality Filtering
 Functions are filtered based on:
@@ -514,9 +523,45 @@ Functions are filtered based on:
         # Create the dataset with the info attached
         dataset = Dataset.from_list(task_dicts, info=info)
         
+        logger.info("Generating instruction prompts with LLM...")
+        
+        llm = LLM(
+            provider=args.llm_provider,
+            model=args.llm_model,
+            batch_size=args.llm_batch_size
+        )
+        
+        system_prompt = (
+            "Create a clear, concise instruction prompt for implementing a function. "
+            "Focus on combining information from both the docstring and surrounding code context."
+        )
+        
+        # Generate prompts for each task
+        prompts = [
+            f"FUNCTION: {item['function_name']}\n\nDOCSTRING:\n{item['docstring']}\n\nCODE CONTEXT:\n{item['masked_code']}"
+            for item in dataset
+        ]
+        
+        # Generate instruction prompts
+        instruction_prompts = llm.generate_completions(prompts, system_prompt)
+
+        # Add instruction prompts to the dataset
+        enhanced_data = []
+        for i, item in enumerate(dataset):
+            item_dict = dict(item)
+            item_dict["instruction_prompt"] = instruction_prompts[i] if i < len(instruction_prompts) else ""
+            enhanced_data.append(item_dict)
+        
+        # Create enhanced dataset
+        dataset = Dataset.from_list(enhanced_data, info=info)
+        logger.info(f"Successfully enhanced {len(dataset)} items with instruction prompts")
+        
         # Push to hub if requested
         if args.push_to_hub:
             logger.info(f"Pushing dataset to HuggingFace Hub as ASSERT-KTH/stack-smol-docstrings-enhanced")
             dataset.push_to_hub("ASSERT-KTH/stack-smol-docstrings-enhanced")
             logger.info(f"Dataset pushed successfully")
             print(f"\nDataset URL: https://huggingface.co/datasets/ASSERT-KTH/stack-smol-docstrings-enhanced")
+
+
+
