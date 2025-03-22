@@ -27,6 +27,8 @@ Was a bit sick during the weekened which is when I am normally the most producti
 - [x] Fix some refactor mismatches
 - [ ] Get train_job.sh working
   - Don't really have a task worth training on right now but it would be very nice to cross this off the list
+- [x] smol-stack-docstrings
+  - now we can train a diff matching implementation generating model 
 - [ ] Train on SWE-Bench-lite on diff matching
   - Find out how they normally put the codebase into the context window
   - Otherwise we could just run repomix

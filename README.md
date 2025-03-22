@@ -58,6 +58,11 @@ Our approach to optimizing models in this project is guided by several foundatio
 ### Project Structure
 
 - `src/`: Source code for the project
+  - `data/`: Dataset loading and processing
+  - `utils/`: Utility functions
+  - `conf/`: Configuration files
+  - `trainer/`: Training utilities
+  - `evaluation/`: Evaluation utilities
 - `scripts/`: Scripts for building, training, and testing
   - `container.def`: Apptainer container definition
   - `build_container.sh`: Script to build the container
