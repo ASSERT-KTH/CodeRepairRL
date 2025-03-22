@@ -15,6 +15,7 @@ wheels/
 logs/
 wandb/
 data/
+!src/data/
 
 blob/
 models/
