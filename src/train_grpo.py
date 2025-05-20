@@ -9,6 +9,7 @@ from hydra.core.config_store import ConfigStore
 from peft import LoraConfig as PEFTLoraConfig
 from trl import GRPOConfig as HFGRPOConfig, GRPOTrainer as HFGRPOTrainer
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from unsloth import FastLanguageModel # Added for Unsloth
 
 from src.agents import nano_rollout_func
 from src.rewards import (
@@ -59,12 +60,15 @@ class RunConfig:
 class ModelConfig:
     # Transformers configuration
     model_name: str = "Qwen/Qwen3-8B"
-    attn_implementation: str = "flash_attention_3"  # only on >Hopper GPUs
+    attn_implementation: str = "flash_attention_3"  # only on >Hopper GPUs # Unsloth typically manages attention. This may be ignored when using Unsloth.
+    load_in_4bit: bool = True # Added for Unsloth
+    unsloth_max_seq_length: Optional[int] = None # Added for Unsloth
     # LoRA configuration
     lora: bool = True
     # only used if run.lora is true
     r: int = 32
     lora_alpha: int = 64
+    lora_dropout: float = 0.0 # Added for Unsloth
     target_modules: tuple[str] = ("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj")
 
 @dataclass
@@ -96,6 +100,7 @@ class GRPOConfig:
 
     # Reward settings
     scale_rewards: bool = False  # from Dr. GRPO, reward scaling introduces question-level difficulty bias
+    use_liger_loss: bool = False # Added for LIGER loss
     
     # Training loop settings
     logging_steps: int = 1
@@ -111,6 +116,7 @@ class GRPOConfig:
 
     # silence peft warnings
     label_names: list[str] = field(default_factory=lambda: ["labels"])
+    gradient_checkpointing: bool = True # Added for gradient checkpointing
 
 @dataclass
 class Config:
@@ -131,25 +137,63 @@ def main(cfg: Config) -> None:
     # Log precision settings
     precision_mode = "BF16" if cfg.grpo.bf16 else "FP16" if cfg.grpo.fp16 else "FP32"
     logger.info(f"Training with {precision_mode} precision based on GPU architecture")
-    
-    model = AutoModelForCausalLM.from_pretrained(cfg.model.model_name)
-    if "Qwen3" in cfg.model.model_name:  # Qwen3's jinja template is bugged
-        tokenizer = AutoTokenizer.from_pretrained(cfg.model.model_name, chat_template=open("fixed_qwen3.jinja").read())
+
+    # Determine max_seq_length for Unsloth
+    if cfg.model.unsloth_max_seq_length is not None:
+        max_seq_length_model = cfg.model.unsloth_max_seq_length
+        logger.info(f"Using unsloth_max_seq_length from ModelConfig: {max_seq_length_model}")
     else:
-        tokenizer = AutoTokenizer.from_pretrained(cfg.model.model_name)
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "left"  # by padding a batch of prompts on the left side we can generate many completions in parallel (padding tokens are masked away)
+        max_seq_length_model = cfg.grpo.max_prompt_length + cfg.grpo.max_completion_length
+        if max_seq_length_model < 512: # Ensure a minimum reasonable length
+            logger.warning(f"Derived max_seq_length_model ({max_seq_length_model}) is less than 512. Setting to 512.")
+            max_seq_length_model = 512
+        else:
+            logger.info(f"Derived max_seq_length_model as {max_seq_length_model} from GRPOConfig prompt/completion lengths.")
+
+    tokenizer_kwargs = {}
+    if "Qwen3" in cfg.model.model_name:
+        try:
+            with open("fixed_qwen3.jinja", "r") as f:
+                tokenizer_kwargs["chat_template"] = f.read()
+            logger.info("Applied fixed_qwen3.jinja chat template.")
+        except FileNotFoundError:
+            logger.error("fixed_qwen3.jinja not found. Qwen3 may not use the intended chat template.")
+
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=cfg.model.model_name,
+        max_seq_length=max_seq_length_model,
+        dtype=None,  # Unsloth auto-detects based on model config or system capabilities
+        load_in_4bit=cfg.model.load_in_4bit, # Using 4-bit quantization as per Unsloth's recommendation
+        token=os.environ.get("HF_TOKEN"),
+        tokenizer_kwargs=tokenizer_kwargs,
+        # attn_implementation from cfg.model.attn_implementation is not directly passed here,
+        # as Unsloth handles optimal attention mechanism.
+    )
+    # Unsloth's FastLanguageModel.from_pretrained typically sets tokenizer.pad_token = tokenizer.eos_token
+    # and tokenizer.padding_side = "left". We rely on this behavior.
+    # If issues arise, explicit setting can be re-added:
+    # if tokenizer.pad_token is None: tokenizer.pad_token = tokenizer.eos_token
+    # tokenizer.padding_side = "left"
+    logger.info(f"Loaded model {cfg.model.model_name} with Unsloth. Max sequence length: {max_seq_length_model}. Tokenizer padding side: {tokenizer.padding_side}.")
+
 
     if cfg.model.lora:
-        lora_params = OmegaConf.to_container(cfg.model, resolve=True)
-        lora_config = PEFTLoraConfig(
-            r=lora_params["r"],
-            lora_alpha=lora_params["lora_alpha"],
-            target_modules=lora_params["target_modules"],
-            task_type="CAUSAL_LM"
+        model = FastLanguageModel.get_peft_model(
+            model,
+            r=cfg.model.r,
+            lora_alpha=cfg.model.lora_alpha,
+            target_modules=list(cfg.model.target_modules), # Ensure it's a list if it's a tuple in config
+            lora_dropout=cfg.model.lora_dropout, # Default, can be configured
+            bias="none",      # Default, can be configured
+            use_gradient_checkpointing="unsloth",
+            random_state=3407, # From Unsloth examples, for reproducibility
+            # max_seq_length is already set on the base model.
         )
+        lora_config = None # Model is now a PeftModel, GRPOTrainer doesn't need separate lora_config
+        logger.info("Applied LoRA configuration using Unsloth's get_peft_model.")
     else:
         lora_config = None
+        logger.info("LoRA is disabled. Using base model.")
 
     rollout_func = None
     # Get dataset based on the task

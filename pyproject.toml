@@ -20,6 +20,7 @@ dependencies = [
     "gitpython>=3.1.44",
     # Is required BEFORE the package manager considers vLLM flash-attn
     "setuptools>=75.8.0",
+    "unsloth[cu121-ampere-torch230] @ git+https://github.com/unslothai/unsloth.git",
 ]
 
 [project.optional-dependencies]

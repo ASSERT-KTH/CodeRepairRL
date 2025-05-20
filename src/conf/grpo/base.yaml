@@ -13,6 +13,7 @@ optim: "paged_adamw_8bit"
 
 # Reward settings
 scale_rewards: false  # from Dr. GRPO, reward scaling introduces question-level difficulty bias
+use_liger_loss: false
 
 # Model settings
 bf16: true  # we will almost assuredly always use bf16
@@ -24,6 +25,7 @@ gradient_accumulation_steps: 2
 num_generations: 4
 max_prompt_length: 512  # will be decreased if the longest sequence in the dataset is shorter
 max_completion_length: 256  # will be increased by the complement of the above (max of model)
+     gradient_checkpointing: true
 
 # Training loop settings
 logging_steps: 1

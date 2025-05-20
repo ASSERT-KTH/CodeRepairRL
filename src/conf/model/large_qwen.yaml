@@ -2,6 +2,9 @@ defaults:
   - medium_qwen
 
 model_name: "Qwen/Qwen3-32B"
+load_in_4bit: true
+unsloth_max_seq_length: null
 # only used if run.lora is true
 r: 64
 lora_alpha: 128
+lora_dropout: 0.0
