@@ -5,7 +5,6 @@ From: pytorch/pytorch:2.5.1-cuda12.1-cudnn9-devel
     export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
     export PROJECT_DIR=/proj/berzelius-2024-336/users/x_bjabj
     export HF_HOME=$PROJECT_DIR/.hf
-    export TRANSFORMERS_CACHE=$PROJECT_DIR/.cache/huggingface/transformers
     export HF_DATASETS_CACHE=$PROJECT_DIR/.cache/huggingface/datasets
 
 %files

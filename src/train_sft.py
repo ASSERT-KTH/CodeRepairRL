@@ -86,7 +86,12 @@ def main(cfg: Config) -> None:
 
     # Login to HuggingFace if pushing to hub
     if cfg.run.push_to_hub:
-        login()  # Will use token from environment or cache
+        hf_token = os.environ.get("HF_TOKEN")
+        if hf_token:
+            login(token=hf_token)
+        else:
+            logger.warning("HF_TOKEN not found in environment. Attempting login without token...")
+            login()
     
     # Log precision settings
     precision_mode = torch.bfloat16 if cfg.sft.bf16 else torch.float16 if cfg.sft.fp16 else torch.float32
