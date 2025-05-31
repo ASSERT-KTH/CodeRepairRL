@@ -2,12 +2,13 @@
 #SBATCH --job-name=swe-gym-sft
 #SBATCH --output=logs/sft_%j.out
 #SBATCH --error=logs/sft_%j.err
-#SBATCH --gpus 2
+#SBATCH --gpus 1
 #SBATCH --time=24:00:00
 #SBATCH -C "fat"
 
 # SFT training with DeepSpeed on curated SWE-Gym data
-# Uses 2 GPUs for training
+# Uses 1 GPUs for training
+
 
 # Training parameters
 DATASET_NAME="bjarni/swe-gym-lite-sft"
@@ -35,12 +36,8 @@ if [ -z "$HF_TOKEN" ]; then
 fi
 
 # Run SFT training with DeepSpeed using Hydra config overrides
-CUDA_VISIBLE_DEVICES=0,1 apptainer exec --nv crrl.sif \
-    accelerate launch \
-    --config_file scripts/deepspeed/zero2.yaml \
-    src/train_sft.py \
-    --config-path=conf \
-    --config-name=sft_config \
+CUDA_VISIBLE_DEVICES=0 FLASH_ATTENTION_FORCE_DISABLED=1 apptainer exec --nv crrl.sif \
+    python -m src.train_sft \
     run.wandb_project="SWE-Gym-SFT-Production" \
     run.dataset_name="$DATASET_NAME" \
     run.output_model_name="$OUTPUT_MODEL" \

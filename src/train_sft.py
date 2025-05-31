@@ -77,7 +77,7 @@ class Config:
 # Register the config schema
 cs = ConfigStore.instance()
 cs.store(name="base_sft_config", node=Config, group="")
-OmegaConf.register_new_resolver("resolve_git_commit_hash", resolve_git_commit_hash)
+# OmegaConf.register_new_resolver("resolve_git_commit_hash", resolve_git_commit_hash)
 
 
 @hydra.main(version_base="1.1", config_path="conf", config_name="sft_config")
@@ -97,7 +97,7 @@ def main(cfg: Config) -> None:
     model = AutoModelForCausalLM.from_pretrained(
         cfg.model.model_name, 
         torch_dtype=precision_mode,
-        attn_implementation=cfg.model.attn_implementation,
+        # attn_implementation=cfg.model.attn_implementation,
         trust_remote_code=True
     )
     
