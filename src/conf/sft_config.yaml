@@ -6,10 +6,10 @@ defaults:
 # Run configuration (parameters not in SFTConfig)
 run:
   wandb_project: "SWE-Gym-SFT"
-  dataset_name: "bjarni/swe-gym-lite-sft"
+  dataset_name: "ASSERT-KTH/SWE-Gym-Nano-SFT"
   max_seq_length: 8192
   reward_min: 0.2
-  output_model_name: "bjarni/qwen3-8b-swe-gym-sft"
+  output_model_name: null  # configured in the script
   push_to_hub: true
 
 hydra:

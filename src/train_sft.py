@@ -11,10 +11,10 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTTrainer, SFTConfig as HFSFTConfig
 from peft import LoraConfig as PEFTLoraConfig
 from huggingface_hub import login
+from datasets import load_dataset
 
 from src.train_grpo import ModelConfig
-from src.utils.git import resolve_git_commit_hash
-from src.data.swe_gym import get_swe_gym_formatted_sft_dataset
+from src.data import get_swe_gym_formatted_sft_dataset
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ for noisy in ("httpx", "LiteLLM", "transformers.tokenization_utils_base"):
 @dataclass
 class RunConfig:
     wandb_project: str = "SWE-Gym-SFT"
-    dataset_name: str = "bjarni/swe-gym-lite-sft"
+    dataset_name: str = "ASSERT-KTH/SWE-Gym-Nano-SFT"
     max_seq_length: int = 8192
     reward_min: float = 0.2
     output_model_name: str = "bjarni/qwen3-8b-swe-gym-sft"
@@ -51,6 +51,10 @@ class SFTConfig:
     bf16: bool = True
     fp16: bool = False
     gradient_checkpointing: bool = True
+
+    # Logging parameters
+    logging_steps: int = 1
+    logging_first_step: bool = True
     logging_steps: int = 10
     save_steps: int = 500
     eval_steps: int = 500
@@ -84,6 +88,8 @@ cs.store(name="base_sft_config", node=Config, group="")
 def main(cfg: Config) -> None:
     os.environ["WANDB_PROJECT"] = cfg.run.wandb_project
 
+    cfg.run.output_model_name = f"ASSERT-KTH/{cfg.model.model_name.split('/')[-1]}-sft"
+
     # Login to HuggingFace if pushing to hub
     if cfg.run.push_to_hub:
         hf_token = os.environ.get("HF_TOKEN")
@@ -103,6 +109,7 @@ def main(cfg: Config) -> None:
         cfg.model.model_name, 
         torch_dtype=precision_mode,
         # attn_implementation=cfg.model.attn_implementation,
+        use_cache=False,  # incompatible with gradient checkpointing
         trust_remote_code=True
     )
     
@@ -132,7 +139,8 @@ def main(cfg: Config) -> None:
         )
         logger.info(f"Using LoRA with r={cfg.model.r}, alpha={cfg.model.lora_alpha}")
     
-    # Load and prepare dataset using the swe_gym function
+    # Load and format the SFT dataset
+    logger.info(f"Loading SFT dataset: {cfg.run.dataset_name}")
     train_dataset = get_swe_gym_formatted_sft_dataset(
         dataset_name=cfg.run.dataset_name,
         tokenizer=tokenizer,

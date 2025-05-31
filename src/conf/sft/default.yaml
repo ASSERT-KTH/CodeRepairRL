@@ -1,7 +1,7 @@
 # TrainingArguments parameters
 output_dir: "outputs/sft_model"
 num_train_epochs: 3
-per_device_train_batch_size: 4
+per_device_train_batch_size: 2
 gradient_accumulation_steps: 4
 learning_rate: 2e-5
 warmup_ratio: 0.1
@@ -15,7 +15,8 @@ fp16: false
 gradient_checkpointing: true
 
 # Logging
-logging_steps: 10
+logging_steps: 1
+logging_first_step: true
 save_steps: 500
 eval_steps: 500
 report_to: "wandb"
@@ -31,3 +32,4 @@ max_length: 8192
 packing: false
 dataset_num_proc: 4
 dataset_kwargs: {} 
+
