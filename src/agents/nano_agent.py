@@ -25,6 +25,7 @@ class NanoConfig:
     min_p: float = 0.01
     top_k: int = 20
     verbose: bool = False
+    log: bool = False
 
 
 def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
