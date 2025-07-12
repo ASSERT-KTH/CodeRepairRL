@@ -11,3 +11,7 @@ from .reasoning import (
     partial_reasoning_format_reward_func,
     strict_reasoning_format_reward_func,
 )
+from .strategy import (
+    progressive_understanding_reward_func,
+    command_preference_reward_func,
+)
