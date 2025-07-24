@@ -149,6 +149,86 @@ cs = ConfigStore.instance()
 cs.store(name="base_grpo_config", node=Config, group="")
 OmegaConf.register_new_resolver("resolve_git_commit_hash", resolve_git_commit_hash)
 
+def debug(self):
+        # For DeepSpeed ZeRO-3 and FSDP, we need to gather all parameters before operations
+        deepspeed_plugin = self.accelerator.state.deepspeed_plugin
+        zero_stage_3 = deepspeed_plugin is not None and deepspeed_plugin.zero_stage == 3
+        if zero_stage_3:
+            import deepspeed
+
+            gather_if_zero3 = deepspeed.zero.GatheredParameters
+        else:
+            gather_if_zero3 = nullcontext
+
+        if is_peft_model(self.model):
+            if self.is_fsdp_enabled:
+                # FSDP path temporarily disabled - needs different handling
+                raise NotImplementedError(
+                    "FSDP with PEFT is temporarily disabled in this implementation. "
+                    "The incremental gathering approach needs to be adapted for FSDP."
+                )
+            else:
+                # DeepSpeed ZeRO-3 with PEFT: Process each LoRA module individually
+                prefix = self.model.prefix
+
+                for mod_name, module in self.model.named_modules():
+                    if not hasattr(module, "merge"):  # Skip non-LoRA blocks
+                        logger.info(f"Skipping non-LoRA block: {mod_name}")
+                        continue
+                    
+                    logger.info(f"Before filtering: {mod_name}")
+                    # Apply the exact same filtering logic as original code
+                    name = f"{mod_name}.weight"
+                    name = name.removeprefix("base_model.model.").replace(".base_layer", "")
+                    logger.info(f"After filtering: {name}")
+                    if prefix in name:
+                        logger.info(f"Prefix {prefix} in {name}")
+                        continue
+                    if "original_module" in name:
+                        logger.info(f"Original module in {name}")
+                        continue
+                    name = name.replace("modules_to_save.default.", "")
+
+
+                    params = [module.weight] + list(module.lora_A.values()) + list(module.lora_B.values())
+                    logger.info(f"Number of params before filtering: {len(params)}")
+                    to_gather = [p for p in params if hasattr(p, "ds_tensor")]
+                    logger.info(f"Number of params after filtering: {len(to_gather)}")
+                    # Gather base + A + B on this rank only for the merge
+                    with gather_if_zero3(to_gather):
+                        for param in to_gather: logger.info(f"Sum of params before merge: {param.sum()}")
+                        module.merge()  # In-place W += B@A*α
+                        for param in to_gather: logger.info(f"Sum of params after merge: {param.sum()}")
+                        logger.info(f"Shape of module.weight: {module.weight.shape}")
+                        
+                        if self.vllm_mode in ["server", "async_server"] and self.accelerator.is_main_process:
+                            self.vllm_client.update_named_param(name, module.weight.data)
+                        elif self.vllm_mode == "colocate":
+                            llm_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
+                            llm_model.load_weights([(name, module.weight.data)])
+                        
+                        module.unmerge()  # Keep training on LoRA
+        else:
+            # For non-PEFT models, simply gather (if needed) and update each parameter individually.
+            if self.is_fsdp_enabled:
+                self._sync_fsdp_params_to_vllm(self.model)  # use memory-efficient post-order traversal for FSDP
+            else:
+                for name, param in self.model.named_parameters():
+                    with gather_if_zero3([param]):
+                        if self.vllm_mode in ["server", "async_server"] and self.accelerator.is_main_process:
+                            self.vllm_client.update_named_param(name, param.data)
+                        elif self.vllm_mode == "colocate":
+                            llm_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
+                            llm_model.load_weights([(name, param.data)])
+
+        # Reset cache on vLLM
+        if self.vllm_mode in ["server", "async_server"] and self.accelerator.is_main_process:
+            self.vllm_client.reset_prefix_cache()
+        elif self.vllm_mode == "colocate":
+            self.llm.reset_prefix_cache()
+
+HFGRPOTrainer._move_model_to_vllm = debug
+
 
 @hydra.main(version_base="1.1", config_path="conf", config_name="grpo_config")
 def main(cfg: Config) -> None:    
