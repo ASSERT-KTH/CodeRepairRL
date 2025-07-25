@@ -63,7 +63,7 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
     return result
 
 
-def nano_rollout_func(data: list[dict[str, Any]], config: NanoConfig) -> list[dict[str, Any]]:
+def nano_rollout_func(data: list[dict[str, Any]], config: NanoConfig, **kwargs) -> list[dict[str, Any]]:
     """Deploys parallel Nano agents talking to our trl vllm-serve-async endpoint to process the given data"""
 
     logger.info(f"Starting {len(data)} agent rollouts")
