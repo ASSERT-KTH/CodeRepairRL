@@ -50,6 +50,7 @@ CUDA_VISIBLE_DEVICES=2,3,4,5 apptainer exec --nv crrl.sif accelerate launch \
         run.dataset_name="SWE-Gym/SWE-Gym" \
         model=$MODEL_CONFIG \
         model.model_name=$MODEL_NAME \
+        agent.time_limit=100 \
         grpo=multi_turn \
         grpo.max_prompt_length=$MAX_PROMPT_LENGTH \
         grpo.max_completion_length=$MAX_COMPLETION_LENGTH \

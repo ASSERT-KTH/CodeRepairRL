@@ -50,6 +50,7 @@ CUDA_VISIBLE_DEVICES=1,2 apptainer exec --nv crrl.sif accelerate launch \
         run=repo_repair \
         model=$MODEL_CONFIG \
         model.model_name=$MODEL_NAME \
+        agent.time_limit=80 \
         grpo=multi_turn \
         grpo.max_prompt_length=$MAX_PROMPT_LENGTH \
         grpo.max_completion_length=$MAX_COMPLETION_LENGTH \
