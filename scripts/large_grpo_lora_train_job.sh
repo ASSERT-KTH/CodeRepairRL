@@ -10,7 +10,8 @@
 # Large GRPO training job, 4 GPUs, 2 running vLLM, 2 training
 
 # This was crucial to find errors when running distributed training, i.e. quit on deadlock instead of hanging
-export NCCL_ASYNC_ERROR_HANDLING=1
+export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
+export NCCL_DEBUG=INFO
 MASTER_ADDR=$(hostname -s)
 MASTER_PORT=43001
 
@@ -26,22 +27,22 @@ VLLM_CONTEXT_LENGTH=$((MAX_CONTEXT_LENGTH + 1024))  # not strictly needed, but s
 
 # VLLM server - loads initial model (any same-architecture model works)
 # Training server will sync weights from training model before first inference
-CUDA_VISIBLE_DEVICES=4,5 apptainer exec --nv crrl.sif \
+CUDA_VISIBLE_DEVICES=0,1 apptainer exec --nv crrl.sif \
     trl vllm-serve-async \
     --model "$MODEL_NAME" \
     --max_model_len $VLLM_CONTEXT_LENGTH \
     --disable_log_stats \
-    --gpu_memory_utilization 0.94 \
+    --gpu_memory_utilization 0.7 \
+    --max_num_seqs 8 \
     --enable_auto_tool_choice \
     --reasoning_parser qwen3 \
     --tool_call_parser hermes \
     --tensor_parallel_size 2 \
     &  # & makes it run in the background
 
-sleep 200  # wait for vLLM server to start
+sleep 100  # give the vLLM server a bit more time to start
 
-# IMPORTANT: train job should include DEVICE 0
-CUDA_VISIBLE_DEVICES=0,1,2,3 apptainer exec --nv crrl.sif accelerate launch \
+CUDA_VISIBLE_DEVICES=2,3,4,5 apptainer exec --nv crrl.sif accelerate launch \
     --config_file scripts/deepspeed/zero3.yaml \
     --num_processes 4 \
     --module src.train_grpo -- \
@@ -53,9 +54,9 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 apptainer exec --nv crrl.sif accelerate launch \
         grpo.max_prompt_length=$MAX_PROMPT_LENGTH \
         grpo.max_completion_length=$MAX_COMPLETION_LENGTH \
         grpo.num_train_epochs=2 \
-        grpo.num_generations=8 \
+        grpo.num_generations=4 \
         grpo.generation_batch_size=8 \
-        grpo.per_device_train_batch_size=2 \
+        grpo.per_device_train_batch_size=1 \
         grpo.gradient_accumulation_steps=8 \
         grpo.beta=0.04 \
         grpo.scale_rewards=false \

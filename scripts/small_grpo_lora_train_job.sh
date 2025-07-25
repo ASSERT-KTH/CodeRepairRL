@@ -11,7 +11,7 @@
 # Small GRPO train job, 3 fat GPUs, 1 running vLLM, 2 training
 
 # This was crucial to find errors when running distributed training, i.e. quit on deadlock instead of hanging
-export NCCL_ASYNC_ERROR_HANDLING=1
+export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 MASTER_ADDR=$(hostname -s)
 MASTER_PORT=43001
 
