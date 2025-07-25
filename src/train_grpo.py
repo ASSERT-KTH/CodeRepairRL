@@ -223,10 +223,10 @@ def main(cfg: Config) -> None:
         dataset = get_swe_gym_repo_repair_dataset(dataset_name=cfg.run.dataset_name)
         # Update agent config with model and token_limit
         cfg.agent.model = f"hosted_vllm/{cfg.model.model_name}"
-        cfg.agent.token_limit = cfg.grpo.max_prompt_length + cfg.grpo.max_completion_length - 512
+        cfg.agent.token_limit = cfg.grpo.max_prompt_length + cfg.grpo.max_completion_length
         # Convert OmegaConf to NanoConfig dataclass
         agent_config = NanoConfig(**OmegaConf.to_container(cfg.agent, resolve=True))
-        rollout_func = partial(nano_rollout_func, config=agent_config, timeout=80)
+        rollout_func = partial(nano_rollout_func, config=agent_config)
         reward_functions = [
             unified_diff_file_match_reward_func,  # 0 or 1 most of the time
             unified_diff_similarity_reward_func,  # 0-1, on average around ~0.2 for Qwen3-8B, 1 is hardly attainable

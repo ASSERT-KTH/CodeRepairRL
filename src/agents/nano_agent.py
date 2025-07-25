@@ -3,7 +3,7 @@ import time
 import logging
 from typing import Any, Optional
 from dataclasses import dataclass, asdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 from nano import Agent
 
@@ -18,11 +18,12 @@ class NanoConfig:
     api_base: str = "http://localhost:8000/v1"
     thinking: bool = False
     token_limit: int = 8192
-    tool_limit: int = 100
-    temperature: float = 0.6
+    tool_limit: int = 30
+    time_limit: int = 60
+    temperature: float = 0.7
     top_p: float = 0.95
-    min_p: float = 0.05
-    top_k: int = 20
+    min_p: Optional[float] = None
+    top_k: Optional[int] = None
     verbose: bool = False
     log: bool = False
 
@@ -62,32 +63,16 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
     return result
 
 
-def nano_rollout_func(data: list[dict[str, Any]], config: NanoConfig, timeout: int = 120, **kwargs) -> list[dict[str, Any]]:
+def nano_rollout_func(data: list[dict[str, Any]], config: NanoConfig) -> list[dict[str, Any]]:
     """Deploys parallel Nano agents talking to our trl vllm-serve-async endpoint to process the given data"""
-
-    results = []
-    ok, tout, err = 0, 0, 0
 
     logger.info(f"Starting {len(data)} agent rollouts")
     start_time = time.time()
+    
     with ThreadPoolExecutor(max_workers=min(len(data), os.cpu_count())) as executor:
-        futures = [executor.submit(_process_one, datum, config) for datum in data]
-
-        for fut in as_completed(futures):
-            try:
-                results.append(fut.result(timeout=timeout))
-                ok += 1
-            except TimeoutError:
-                logger.warning(f"Rollout timed out after {timeout}s")
-                results.append(dict(prompt=[], completion=[], tools=[], generated_diff=""))
-                tout += 1
-            except Exception as e:
-                logger.error(f"Rollout error: {type(e).__name__}: {e}")
-                results.append(dict(prompt=[], completion=[], tools=[], generated_diff=""))
-                err += 1
+        results = list(executor.map(lambda datum: _process_one(datum, config), data))
 
     logger.info(f"Finished rollouts {len(data)} in {time.time() - start_time:.2f}s")
-    logger.info(f"Success: {ok}, Timeout: {tout}, Error: {err}")
     return results
 
 
@@ -112,7 +97,7 @@ if __name__ == "__main__":
         times = []
         for i in range(runs):
             start_time = time.time()
-            results = nano_rollout_func(subset_dicts, config, timeout=120)
+            results = nano_rollout_func(subset_dicts, config)
             elapsed = time.time() - start_time
             times.append(elapsed)
             print(f"  Run {i+1}: {elapsed:.2f}s")
