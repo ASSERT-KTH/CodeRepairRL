@@ -8,3 +8,4 @@ top_p: 0.8
 min_p: 0.01
 top_k: 20
 verbose: false
+log: False
