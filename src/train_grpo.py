@@ -149,6 +149,9 @@ cs = ConfigStore.instance()
 cs.store(name="base_grpo_config", node=Config, group="")
 OmegaConf.register_new_resolver("resolve_git_commit_hash", resolve_git_commit_hash)
 
+from contextlib import nullcontext
+from accelerate.utils import is_peft_model
+
 def debug(self):
         # For DeepSpeed ZeRO-3 and FSDP, we need to gather all parameters before operations
         deepspeed_plugin = self.accelerator.state.deepspeed_plugin
@@ -173,40 +176,41 @@ def debug(self):
 
                 for mod_name, module in self.model.named_modules():
                     if not hasattr(module, "merge"):  # Skip non-LoRA blocks
-                        logger.info(f"Skipping non-LoRA block: {mod_name}")
+                        print(f"Skipping non-LoRA block: {mod_name}")
                         continue
+                    print(f"Keeping LoRA block: {mod_name}")
                     
-                    logger.info(f"Before filtering: {mod_name}")
+                    print(f"Before filtering: {mod_name}")
                     # Apply the exact same filtering logic as original code
                     name = f"{mod_name}.weight"
                     name = name.removeprefix("base_model.model.").replace(".base_layer", "")
-                    logger.info(f"After filtering: {name}")
+                    print(f"After filtering: {name}")
                     if prefix in name:
-                        logger.info(f"Prefix {prefix} in {name}")
+                        print(f"Prefix {prefix} in {name}")
                         continue
                     if "original_module" in name:
-                        logger.info(f"Original module in {name}")
+                        print(f"Original module in {name}")
                         continue
                     name = name.replace("modules_to_save.default.", "")
 
 
                     params = [module.weight] + list(module.lora_A.values()) + list(module.lora_B.values())
-                    logger.info(f"Number of params before filtering: {len(params)}")
+                    print(f"Number of params before filtering: {len(params)}")
                     to_gather = [p for p in params if hasattr(p, "ds_tensor")]
-                    logger.info(f"Number of params after filtering: {len(to_gather)}")
+                    print(f"Number of params after filtering: {len(to_gather)}")
                     # Gather base + A + B on this rank only for the merge
                     with gather_if_zero3(to_gather):
-                        for param in to_gather: logger.info(f"Sum of params before merge: {param.sum()}")
+                        print(module.weight.data.sum())
                         module.merge()  # In-place W += B@A*α
-                        for param in to_gather: logger.info(f"Sum of params after merge: {param.sum()}")
-                        logger.info(f"Shape of module.weight: {module.weight.shape}")
+                        print(module.weight.data.sum())
+                        print(f"Shape of module.weight: {module.weight.shape}")
                         
                         if self.vllm_mode in ["server", "async_server"] and self.accelerator.is_main_process:
                             self.vllm_client.update_named_param(name, module.weight.data)
                         elif self.vllm_mode == "colocate":
                             llm_model = self.llm.llm_engine.model_executor.driver_worker.model_runner.model
                             llm_model.load_weights([(name, module.weight.data)])
-                        
+                                                
                         module.unmerge()  # Keep training on LoRA
         else:
             # For non-PEFT models, simply gather (if needed) and update each parameter individually.
@@ -226,8 +230,6 @@ def debug(self):
             self.vllm_client.reset_prefix_cache()
         elif self.vllm_mode == "colocate":
             self.llm.reset_prefix_cache()
-
-HFGRPOTrainer._move_model_to_vllm = debug
 
 
 @hydra.main(version_base="1.1", config_path="conf", config_name="grpo_config")
@@ -334,6 +336,9 @@ def main(cfg: Config) -> None:
         train_dataset=dataset,
         peft_config=lora_config
     )
+    # Bind the debug function to the trainer instance
+    import types
+    trainer._move_model_to_vllm = types.MethodType(debug, trainer)
 
     trainer.train(resume_from_checkpoint=cfg.grpo.resume_from_checkpoint is not None)
 
