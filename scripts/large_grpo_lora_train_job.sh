@@ -32,7 +32,7 @@ CUDA_VISIBLE_DEVICES=0,1 apptainer exec --nv crrl.sif \
     --model "$MODEL_NAME" \
     --max_model_len $VLLM_CONTEXT_LENGTH \
     --disable_log_stats \
-    --gpu_memory_utilization 0.7 \
+    --gpu_memory_utilization 0.94 \
     --max_num_seqs 8 \
     --enable_auto_tool_choice \
     --reasoning_parser qwen3 \
@@ -50,8 +50,8 @@ CUDA_VISIBLE_DEVICES=2,3,4,5 apptainer exec --nv crrl.sif accelerate launch \
         run.dataset_name="SWE-Gym/SWE-Gym" \
         model=$MODEL_CONFIG \
         model.model_name=$MODEL_NAME \
-        agent.time_limit=100 \
-        grpo=multi_turn \
+        agent.time_limit=80 \
+        grpo=multi_turn_gspo \
         grpo.max_prompt_length=$MAX_PROMPT_LENGTH \
         grpo.max_completion_length=$MAX_COMPLETION_LENGTH \
         grpo.num_train_epochs=2 \

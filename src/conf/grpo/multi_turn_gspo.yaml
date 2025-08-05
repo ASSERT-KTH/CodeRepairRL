@@ -1,0 +1,5 @@
+defaults:
+  - multi_turn
+
+use_liger_loss: true  # added support for GSPO by forking liger-kernel
+importance_sampling_level: "sequence"

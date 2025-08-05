@@ -32,6 +32,7 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
     assert "repo" in data and "base_commit" in data and "problem_statement" in data
 
     logger.info(f"[START] {data['repo']} @ {data['base_commit'][:7]}")
+    start_time = time.time()
 
     agent = Agent(**asdict(config))
 
@@ -40,7 +41,21 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
     try:
         repo_url = handle_to_url(data["repo"])
         temp_folder = clone_repo_at_commit(repo_url, data["base_commit"])
+    except Exception as e:
+        agent._reset()
+        agent._append({"role": "user", "content": data["problem_statement"]})
+        agent._append({"role": "assistant", "content": ""})  # this should be incredibly rare, only encountered this once in 20+ runs
+        logger.error(f"Error with git in _process_one: {type(e).__name__}: {e}")
+        if temp_folder: clean_repo_dir(temp_folder)
+        return dict(
+            prompt=agent.messages[:2],
+            completion=agent.messages[2:],
+            tools=agent.tools,
+            generated_diff="",
+            **agent.tool_stats
+        )
         
+    try:
         diff = agent.run(task=data["problem_statement"], repo_root=temp_folder)
     except Exception as e:
         logger.error(f"Error in _process_one: {type(e).__name__}: {e}")
@@ -51,7 +66,7 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
         token_usage = agent.token_usage
         tool_usage = agent.tool_usage
         diff_success = diff != ""
-        logger.info(f"[FINISH] {data['repo']} @ {data['base_commit'][:7]} - Tokens: {token_usage}, Tools: {tool_usage}, Diff Success: {diff_success}")
+        logger.info(f"[FINISH] {data['repo']} @ {data['base_commit'][:7]} - Tokens: {token_usage}, Tools: {tool_usage}, Diff Success: {diff_success}, Time: {time.time() - start_time:.2f}s")
 
     result = dict(
         prompt=agent.messages[:2],
@@ -72,7 +87,7 @@ def nano_rollout_func(data: list[dict[str, Any]], config: NanoConfig, **kwargs) 
     with ThreadPoolExecutor(max_workers=min(len(data), os.cpu_count())) as executor:
         results = list(executor.map(lambda datum: _process_one(datum, config), data))
 
-    logger.info(f"Finished rollouts {len(data)} in {time.time() - start_time:.2f}s")
+    logger.info(f"Finished {len(data)} rollouts in {time.time() - start_time:.2f}s")
     return results
 
 

@@ -9,6 +9,8 @@ dependencies = [
     "trl @ git+https://github.com/ASSERT-KTH/trl.git@dev",
     # The agent we use for rollout generation,
     "nano-agent @ git+https://github.com/ASSERT-KTH/nano-agent.git",
+    # Optimized loss kernels, forked to support GSPO
+    "liger-kernel @ git+https://github.com/BjarniHaukur/liger-kernel.git",
     # Other HF stuff
     "accelerate>=1.8.0",
     "transformers",
@@ -24,8 +26,6 @@ dependencies = [
     "gitpython>=3.1.44",
     # Is required BEFORE the package manager considers vLLM flash-attn
     "setuptools>=75.8.0",
-    # Optimized loss kernels
-    "liger-kernel",
     # efficient training of LLMs
     "deepspeed",
     # The following is not strictly needed by crrl, but libraries incorrectly pin requirements so we need to narrow them 
