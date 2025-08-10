@@ -508,12 +508,13 @@ diff --git a/docs/README.md b/docs/README.md
         
         # Test similarity scoring - generated has patch, test_patch, and extra file
         sim_scores = unified_diff_similarity_reward_func([oracle_combined], [generated_diff])
-        # Should be 1.0 since both oracle files match (oracle normalizes by oracle count)
-        self.assertEqual(sim_scores[0], 1.0)
+        # With deliberate normalization by max(|oracle|, |generated|), extra files reduce score
+        # Here: 2 oracle files matched out of 3 generated → 2/3
+        self.assertEqual(sim_scores[0], 2/3)
         
-        # Test file matching - should be 1.0 since all oracle files are found
+        # Test file matching - normalization by max(|oracle|, |generated|) also reduces score
         match_scores = unified_diff_file_match_reward_func([oracle_combined], [generated_diff])
-        self.assertEqual(match_scores[0], 1.0)
+        self.assertEqual(match_scores[0], 2/3)
     
     def test_unified_diff_similarity_multiple_batches(self):
         """Test batch processing with different patch and test_patch combinations."""
@@ -912,8 +913,8 @@ diff --git a/extra_file.py b/extra_file.py
 +    changes"""
         
         scores = unified_diff_file_match_reward_func([diff1], [diff2])
-        # Should be 1.0 since all patch files are found
-        self.assertEqual(scores[0], 1.0)
+        # With deliberate normalization by max(|oracle|, |generated|), extra files reduce score
+        self.assertEqual(scores[0], 2/3)
     
     def test_file_match_different_order(self):
         """Test that file order doesn't matter."""

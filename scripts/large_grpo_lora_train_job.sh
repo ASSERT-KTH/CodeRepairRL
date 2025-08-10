@@ -32,7 +32,7 @@ CUDA_VISIBLE_DEVICES=0,1 apptainer exec --nv crrl.sif \
     --model "$MODEL_NAME" \
     --max_model_len $VLLM_CONTEXT_LENGTH \
     --disable_log_stats \
-    --gpu_memory_utilization 0.94 \
+    --gpu_memory_utilization 0.8 \
     --max_num_seqs 8 \
     --enable_auto_tool_choice \
     --reasoning_parser qwen3 \

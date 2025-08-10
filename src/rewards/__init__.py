@@ -11,3 +11,4 @@ from .reasoning import (
     partial_reasoning_format_reward_func,
     strict_reasoning_format_reward_func,
 )
+from .terminal import terminal_debugging_habits_reward_func

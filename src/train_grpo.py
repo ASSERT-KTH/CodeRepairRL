@@ -24,9 +24,8 @@ from src.rewards import (
     sr_diff_format_reward_func,
     sr_diff_similarity_reward_func,
     # repo repair rewards
-    unified_diff_file_match_reward_func,
     unified_diff_similarity_reward_func,
-    unified_diff_similarity_reward_func_test,
+    terminal_debugging_habits_reward_func,
 )
 from src.data import get_stack_repair_dataset, get_primevul_repair_dataset, get_primevul_detection_dataset, get_swe_gym_repo_repair_dataset
 from src.utils.git import resolve_git_commit_hash
@@ -227,12 +226,12 @@ def main(cfg: Config) -> None:
         # Convert OmegaConf to NanoConfig dataclass
         agent_config = NanoConfig(**OmegaConf.to_container(cfg.agent, resolve=True))
         rollout_func = partial(nano_rollout_func, config=agent_config)
+        # Use a single primary reward (diff similarity) plus a tiny continuous terminal shaping term
         reward_functions = [
-            unified_diff_file_match_reward_func,  # 0 or 1 most of the time
-            unified_diff_similarity_reward_func,  # 0-1, on average around ~0.2 for Qwen3-8B, 1 is hardly attainable
-            unified_diff_similarity_reward_func_test,  # 0-1, almost always 0, 1 is basically impossible
+            unified_diff_similarity_reward_func,    # primary objective
+            terminal_debugging_habits_reward_func,  # small, continuous shaping to avoid collapse
         ]
-        reward_weights = [1 * 0.1, 5 * 0.6, 5 * 0.3]  # roughly scaling to one * importance
+        reward_weights = [10, 0.5]
     else:
         raise ValueError(f"Unknown task: {cfg.run.task_type}")  # can't happen but looks nice
 
