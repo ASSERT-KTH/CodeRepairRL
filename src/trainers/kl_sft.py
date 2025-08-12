@@ -10,6 +10,7 @@ class KLSFTConfig(SFTConfig):
         metadata={"help": "KL divergence regularization weight"},
     )
 
+# TODO: This is pretty shitty, when we are training a peft model, we do not need the reference model (just unmerge the adapters)
 class KLSFTTrainer(SFTTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

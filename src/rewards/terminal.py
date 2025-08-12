@@ -33,7 +33,7 @@ def _parse_calls(text: str) -> list[tuple[str, bool, str]]:
     return calls
 
 
-def terminal_debugging_habits_reward_func(completion: list[str], **kwargs) -> list[float]:
+def terminal_debugging_habits_reward_func(completions: list[str], **kwargs) -> list[float]:
     """Reward terminal debugging behaviors from completion transcript only.
 
     Rewards added directly:
@@ -56,12 +56,11 @@ def terminal_debugging_habits_reward_func(completion: list[str], **kwargs) -> li
         search_early_reward = 0.4 if any(re_search.search(cmd) and ok for cmd, ok in calls[:10]) else 0.0
         # +0.3 if one of {sed, head, tail} appears after at least two prior commands
         slice_any_reward = 0.3 if any(ok and re_slice.search(cmd) for cmd, ok in calls[2:]) else 0.0
-        total = ls_early_reward + search_early_reward + slice_any_reward
-        rewards.append(max(0.0, min(1.0, total)))
+        rewards.append(ls_early_reward + search_early_reward + slice_any_reward)
     return rewards
 
 
-def terminal_exploration_depth_reward_func(completion: list[str], **kwargs) -> list[float]:
+def terminal_exploration_depth_reward_func(completions: list[str], **kwargs) -> list[float]:
     """Richer terminal shaping to differentiate productive exploration when no diff is produced.
 
     Components (sum of bonuses <= 0.8, with up to 0.2 penalties; final clipped to [0,1]):
