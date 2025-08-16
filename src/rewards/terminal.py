@@ -33,15 +33,15 @@ def _parse_calls(text: str) -> list[tuple[str, bool, str]]:
     return calls
 
 
-def terminal_debugging_habits_reward_func(completion: list[str], **kwargs) -> list[float]:
-    """Reward terminal debugging behaviors from completion transcript only.
+def terminal_debugging_habits_reward_func(completions: list[str], **kwargs) -> list[float]:
+    """Reward terminal debugging behaviors from completions.
 
     Rewards added directly:
     - +0.3 if ls appears within the first 2 successful shell commands
     - +0.4 if one of {rg, grep, find} appears within the first 10 successful shell commands
     - +0.3 if one of {sed, head, tail} appears anywhere among successful shell commands
     """
-    items: list[str] = list(completion or [])
+    items: list[str] = list(completions or [])
     re_ls = re.compile(r"\bls\b")
     re_search = re.compile(r"\b(rg|grep|find)\b")
     re_slice = re.compile(r"\b(sed|head|tail)\b")
@@ -56,13 +56,12 @@ def terminal_debugging_habits_reward_func(completion: list[str], **kwargs) -> li
         search_early_reward = 0.4 if any(re_search.search(cmd) and ok for cmd, ok in calls[:10]) else 0.0
         # +0.3 if one of {sed, head, tail} appears after at least two prior commands
         slice_any_reward = 0.3 if any(ok and re_slice.search(cmd) for cmd, ok in calls[2:]) else 0.0
-        total = ls_early_reward + search_early_reward + slice_any_reward
-        rewards.append(max(0.0, min(1.0, total)))
+        rewards.append(ls_early_reward + search_early_reward + slice_any_reward)
     return rewards
 
 
-def terminal_exploration_depth_reward_func(completion: list[str], **kwargs) -> list[float]:
-    """Richer terminal shaping to differentiate productive exploration when no diff is produced.
+def terminal_exploration_depth_reward_func(completions: list[str], **kwargs) -> list[float]:
+    """Richer terminal shaping to differentiate productive exploration from unproductive exploration.
 
     Components (sum of bonuses <= 0.8, with up to 0.2 penalties; final clipped to [0,1]):
     - +0.25 chain: a search (rg/grep/find) whose response yields a path that is later used in a precise read (sed/head/tail)
@@ -71,7 +70,7 @@ def terminal_exploration_depth_reward_func(completion: list[str], **kwargs) -> l
     - +0.15 scoped search: presence of search flags (-n/--type) or directory scoping in early search
     - up to -0.20 penalty: duplicated identical commands and repeated failures; truncated outputs before any precise read
     """
-    items: list[str] = list(completion or [])
+    items: list[str] = list(completions or [])
     re_search = re.compile(r"\b(rg|grep|find)\b")
     re_slice = re.compile(r"\b(sed|head|tail)\b")
     re_precise_slice = re.compile(r"\b(sed\s+-n\s+'?\d+\s*,\s*\d+\s*p'?|head\s+-n\s+\d+|tail\s+-n\s+\d+)\b")
