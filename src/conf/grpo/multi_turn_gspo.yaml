@@ -1,5 +1,11 @@
 defaults:
   - multi_turn
 
+# This closely follows
+loss_type: grpo  # needs to be this value to actually work as GSPO
 use_liger_loss: true  # added support for GSPO by forking liger-kernel
-importance_sampling_level: "sequence"
+importance_sampling_level: "sequence"  # GRPO assigns importance weights per token, which is very unstable
+epsilon: 3e-4
+epsilon_high: 4e-4
+num_iterations: 2  # "enables" the "upper biased" clipping above
+beta: 0.0  # no KL 

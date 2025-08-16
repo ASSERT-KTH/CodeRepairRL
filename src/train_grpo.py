@@ -100,6 +100,11 @@ class GRPOConfig:
     max_prompt_length: int = 256
     max_completion_length: int = 256
 
+    # Clipping parameters
+    epsilon: float = 0.2
+    epsilon_high: Optional[float] = None
+    num_iterations: int = 1  # inner loop \mu in the algorithm, turned off unless >1
+
     # GRPO settings
     beta: float = 0.0  # i.e. no reference_model
 
