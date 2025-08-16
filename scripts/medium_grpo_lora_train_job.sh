@@ -27,9 +27,6 @@ MAX_CONTEXT_LENGTH=$((MAX_PROMPT_LENGTH + MAX_COMPLETION_LENGTH))
 VLLM_CONTEXT_LENGTH=$((MAX_CONTEXT_LENGTH + 1024))  # not strictly needed, but so we don't get context window errors
 
 
-# VLLM server - loads initial model (any same-architecture model works)
-# Training server will sync weights from training model before first inference
-# So if we load an SFT model, it will match after setup
 CUDA_VISIBLE_DEVICES=0 apptainer exec --nv crrl.sif \
     trl vllm-serve-async \
     --model "$MODEL_NAME" \
