@@ -59,8 +59,5 @@ CUDA_VISIBLE_DEVICES=1,2 apptainer exec --nv crrl.sif accelerate launch \
         grpo.generation_batch_size=8 \
         grpo.per_device_train_batch_size=4 \
         grpo.gradient_accumulation_steps=8 \
-        grpo.beta=0.04 \
-        grpo.scale_rewards=false \
-        grpo.loss_type=grpo \
         grpo.optim="adamw_torch" \
         "$@"  # pass any additional arguments
