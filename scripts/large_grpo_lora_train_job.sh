@@ -7,6 +7,9 @@
 #SBATCH --time=48:00:00
 #SBATCH -C "fat"
 
+# Apptainer common runtime configuration (requires CRRL_WORKDIR)
+source scripts/appt_common.sh
+
 # Large GRPO training job, 4 GPUs, 2 running vLLM, 2 training
 
 # This was crucial to find errors when running distributed training, i.e. quit on deadlock instead of hanging
@@ -26,7 +29,7 @@ MAX_CONTEXT_LENGTH=$((MAX_PROMPT_LENGTH + MAX_COMPLETION_LENGTH))
 VLLM_CONTEXT_LENGTH=$((MAX_CONTEXT_LENGTH + 1024))  # not strictly needed, but so we don't get context window errors
 
 
-CUDA_VISIBLE_DEVICES=0,1 apptainer exec --nv crrl.sif \
+apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0,1 crrl.sif \
     trl vllm-serve-async \
     --model "$MODEL_NAME" \
     --max_model_len $VLLM_CONTEXT_LENGTH \
@@ -41,7 +44,7 @@ CUDA_VISIBLE_DEVICES=0,1 apptainer exec --nv crrl.sif \
 
 sleep 100  # give the vLLM server a bit more time to start
 
-CUDA_VISIBLE_DEVICES=2,3,4,5 apptainer exec --nv crrl.sif accelerate launch \
+apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=2,3,4,5 crrl.sif accelerate launch \
     --config_file scripts/deepspeed/zero3.yaml \
     --num_processes 4 \
     --module src.train_grpo -- \

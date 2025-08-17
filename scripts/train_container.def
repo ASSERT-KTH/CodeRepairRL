@@ -1,16 +1,9 @@
 Bootstrap: docker
-From: vllm/vllm-openai:v0.9.2
+From: vllm/vllm-openai:v0.10.0
 
 %environment
+    # Keep container largely stateless; runtime env is passed via --env from host
     export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-
-    export PROJECT_DIR=/proj/berzelius-2024-336/users/x_bjabj/
-    export HF_HOME=$PROJECT_DIR/.hf
-    export TRANSFORMERS_CACHE=$PROJECT_DIR/.cache/huggingface/transformers
-    export HF_DATASETS_CACHE=$PROJECT_DIR/.cache/huggingface/datasets
-
-    export PYTHONNOUSERSITE=1
-    export VLLM_ALLOW_INSECURE_SERIALIZATION=1
 
 %files
     src/

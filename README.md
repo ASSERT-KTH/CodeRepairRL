@@ -16,14 +16,6 @@ The methodology and findings of this project are documented in an academic paper
 
 ## Getting Started
 
-### Setting Up Environment Variables
-
-Before building the container, you must edit the `PROJECT_DIR` environment variable in `scripts/train_container.def`:
-
-```bash
-PROJECT_DIR=/proj/<project>/users/<username>
-```
-
 ### Building the Container
 
 To build the Apptainer container:
@@ -34,6 +26,86 @@ apptainer build crrl.sif scripts/train_container.def
 ```
 
 (the build process may take several minutes)
+
+## Reproducing on different compute setups
+
+### Using our Apptainer/SLURM setup
+
+Before launching jobs, you should set `CRRL_WORKDIR` in your environment. Otherwise large files like model weights are downloaded to your `$HOME/.cache`:
+
+```bash
+# Choose your working directory (pick a location with plenty of fast storage)
+export CRRL_WORKDIR="/path/to/your/crrl_workspace"
+```
+
+Then follow the container build and SLURM job submission steps above. This ensures that large model files and datasets are stored in a location with sufficient space rather than your home directory.
+
+### Alternative: Local reproduction with uv
+
+If you do not have Apptainer/SLURM or want to reproduce runs locally, you can use `uv`. Below are self-contained bash snippets.
+
+### 1) Install uv
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### 2) Create the environment and install dependencies
+
+```bash
+# Install project dependencies (creates/uses a virtualenv automatically)
+uv sync --extra vllm --extra flash
+```
+
+### 3.) Exact 14B GRPO reproduction (3x ≥80GB GPUs) — run in two terminals
+
+- Requires 3 GPUs with at least 80 GB VRAM each (e.g., A100 80GB/H100 80GB)
+- Terminal 1 runs the vLLM server on GPU 0; Terminal 2 runs training on GPUs 1–2
+
+Terminal 1 (vLLM server on GPU 0):
+
+```bash
+CUDA_VISIBLE_DEVICES=0 uv run trl vllm-serve-async \
+  --model "Qwen/Qwen3-14B" \
+  --max-model-len 14336 \
+  --gpu-memory-utilization 0.94 \
+  --async-scheduling \
+  --enable-prefix-caching \
+  --max-num-seqs 16 \
+  --max-num-batched-tokens 8192 \
+  --long-prefill-token-threshold 2048 \
+  --disable_log_stats \
+  --enable_auto_tool_choice \
+  --reasoning_parser qwen3 \
+  --tool_call_parser hermes
+# Leave this terminal running
+```
+
+Terminal 2 (trainer on GPUs 1–2):
+
+```bash
+CUDA_VISIBLE_DEVICES=1,2 uv run accelerate launch \
+  --config_file scripts/deepspeed/zero2.yaml \
+  --num_processes 2 \
+  --module src.train_grpo -- \
+        run=repo_repair \
+        model=medium_qwen \
+        agent.time_limit=60 \
+        grpo=multi_turn_gspo \
+        grpo.max_prompt_length=1024 \
+        grpo.max_completion_length=12288 \
+        grpo.num_train_epochs=10 \
+        grpo.num_generations=8 \
+        grpo.generation_batch_size=8 \
+        grpo.per_device_train_batch_size=4 \
+        grpo.gradient_accumulation_steps=4 \
+        grpo.optim=adamw_torch \
+        grpo.run_name="your-run-name"
+```
+
+Notes:
+- If you plan to push to the HuggingFace Hub, run `huggingface-cli login` first and drop `run.push_to_hub=false`.
+- You can override any config at the CLI via Hydra (e.g., change model, learning rate, batch sizes, etc.).
 
 ### Running Supervised Fine-Tuning (SFT)
 
@@ -100,56 +172,6 @@ Windows (project not tested on Windows)
 ```bash
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
-
-### Optimizing Cache Locations
-
-It is recommended to move cache locations to your project directory by adding the following to your `.bashrc` or `.zshrc`:
-
-```bash
-# Set Hugging Face cache locations
-export HF_HOME=$PROJECT_DIR/.hf
-export TRANSFORMERS_CACHE=$PROJECT_DIR/.cache/huggingface/transformers
-export HF_DATASETS_CACHE=$PROJECT_DIR/.cache/huggingface/datasets
-
-# Set uv cache location
-export UV_CACHE_DIR=$PROJECT_DIR/.cache/.uv
-```
-
-This ensures that large model files and datasets are stored in your project directory, which has way more storage space than your home directory.
-
-### Setting Up Development Environment
-
-`uv` will automatically recognize the Python version specified in `.python-version` and set up a virtual environment accordingly.
-
-#### Installing Dependencies
-
-Flash-attn and vLLM require PyTorch to be installed before compilation. Install in this order:
-
-```bash
-# Step 1: Install base dependencies (includes PyTorch)
-uv sync
-
-# Step 2: Install GPU packages after PyTorch is ready
-uv sync --extra vllm --extra flash
-
-# Step 3 (optional): Install developmental dependencies
-uv sync --extra dev
-```
-
-For local development and testing:
-
-```bash
-# Run GRPO training without vLLM (slower but works on single GPU)
-uv run -m src.train_grpo grpo.use_vllm=false
-
-# Run SFT training
-uv run -m src.train_sft
-
-# Curate SFT datasets
-uv run -m src.curate_sft_data
-```
-
-Note: Disabling vLLM means generations happen in the PyTorch environment instead of the highly optimized vLLM server, making it much slower. For production training, use the SLURM scripts with vLLM enabled.
 
 ### Testing
 

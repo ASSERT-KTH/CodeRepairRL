@@ -90,7 +90,8 @@ class GRPOConfig:
     # Model settings - these will be automatically determined based on GPU architecture
     # when using the custom resolvers in the YAML config
     bf16: bool = True
-    fp16: bool = False 
+    fp16: bool = False
+    disable_dropout: bool = True
 
     # Generation and Training settings
     per_device_train_batch_size: int = 4

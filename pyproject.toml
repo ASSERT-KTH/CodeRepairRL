@@ -38,9 +38,9 @@ dependencies = [
 
 [project.optional-dependencies]
 # vLLM is required, but install is brittle needing torch to be installed first
-vllm = ["vllm>=0.8.5; platform_system != 'Darwin'"]
+vllm = ["vllm==0.10.1; platform_system != 'Darwin'"]
+flash = ["flash-attn==2.8.0.post2; platform_system != 'Darwin'", "flashinfer-python==2.7.1.post1; platform_system != 'Darwin'"]
 # Flash attention packages require GPU at compile time, install separately
-# flash = ["flash-attn==2.6.3; platform_system != 'Darwin'", "flashinfer-python==0.2.5; platform_system != 'Darwin'"]
 dev = ["pytest>=8.3.4", "matplotlib>=3.10.0", "scikit-learn>=1.6.1"]
 # Different agents
 # aider = ["aider-chat @ git+https://github.com/BjarniHaukur/aider.git"]

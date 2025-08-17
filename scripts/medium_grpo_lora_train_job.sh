@@ -7,8 +7,11 @@
 #SBATCH --time=24:00:00
 #SBATCH -C "fat"
 
-
 # Medium GRPO train job, 3 fat GPUs, 1 running vLLM, 2 training
+
+# Apptainer common runtime configuration (requires CRRL_WORKDIR)
+source scripts/appt_common.sh
+
 
 # This was crucial to find errors when running distributed training, i.e. quit on deadlock instead of hanging
 export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
@@ -27,19 +30,24 @@ MAX_CONTEXT_LENGTH=$((MAX_PROMPT_LENGTH + MAX_COMPLETION_LENGTH))
 VLLM_CONTEXT_LENGTH=$((MAX_CONTEXT_LENGTH + 1024))  # not strictly needed, but so we don't get context window errors
 
 
-CUDA_VISIBLE_DEVICES=0 apptainer exec --nv crrl.sif \
+apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 crrl.sif \
     trl vllm-serve-async \
     --model "$MODEL_NAME" \
-    --max_model_len $VLLM_CONTEXT_LENGTH \
+    --max-model-len $VLLM_CONTEXT_LENGTH \
+    --gpu-memory-utilization 0.94 \
+    --async-scheduling \
+    --enable-prefix-caching \
+    --max-num-seqs 32 \
+    --max-num-batched-tokens 8192 \
+    --long-prefill-token-threshold 2048 \
     --disable_log_stats \
-    --gpu_memory_utilization 0.94 \
     --enable_auto_tool_choice \
     --reasoning_parser qwen3 \
     --tool_call_parser hermes \
-    &  # & makes it run in the background
+    &
 
 
-CUDA_VISIBLE_DEVICES=1,2 apptainer exec --nv crrl.sif accelerate launch \
+apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=1,2 crrl.sif accelerate launch \
     --main_process_port $MASTER_PORT \
     --num_processes 2 \
     --config_file scripts/deepspeed/zero2.yaml \

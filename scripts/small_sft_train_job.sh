@@ -6,7 +6,9 @@
 #SBATCH --time=24:00:00
 #SBATCH -C "fat"
 
-apptainer exec --nv crrl.sif accelerate launch \
+source scripts/appt_common.sh
+
+apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0,1,2,3 crrl.sif accelerate launch \
     --config_file scripts/deepspeed/zero2.yaml \
     --num_processes 4 \
     --mixed_precision bf16 \
