@@ -29,7 +29,7 @@ generation_batch_size: 4
 max_prompt_length: 256
 max_completion_length: 256
 
-# GRPO settings
+# KL to a frozen version (unmerged LoRA) with this coef
 beta: 0.04
 
 # Reward settings
