@@ -234,9 +234,9 @@ def main(cfg: Config) -> None:
         # Use a single primary reward (diff similarity) plus a tiny continuous terminal shaping term
         reward_functions = [
             unified_diff_similarity_reward_func,    # primary objective
-            terminal_debugging_habits_reward_func,  # small, continuous shaping to avoid collapse
+            # terminal_debugging_habits_reward_func,  # small, continuous shaping to avoid collapse
         ]
-        reward_weights = [10, 0.5]
+        reward_weights = [1]# , 0.1]
     else:
         raise ValueError(f"Unknown task: {cfg.run.task_type}")  # can't happen but looks nice
 
