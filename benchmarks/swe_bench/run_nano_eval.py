@@ -7,6 +7,7 @@ import json
 import sys
 import argparse
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Add parent dir to path to import nano_agent
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -16,60 +17,73 @@ from datasets import load_dataset
 
 
 def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slice_spec: str, output_dir: Path):
-    """Run nano_agent on SWE-bench tasks and save predictions."""
-    
+    """Run nano_agent on SWE-bench tasks and save predictions using a process pool."""
+
     # Load SWE-bench dataset
     dataset = load_dataset(f"princeton-nlp/SWE-bench_{subset}", split=split)
-    
+
     # Parse slice (e.g., ":25" means first 25)
     if slice_spec.startswith(":"):
         dataset = dataset.select(range(int(slice_spec[1:])))
-    
+
     # Setup config for nano_agent
     config = NanoConfig(
-        base_url=endpoint,
-        model=model_name,  # Use the provided model name (e.g., "nano" for LoRA)
-        timeout=300,
-        temperature=0.0
+        api_base=endpoint,
+        model=model_name,  # e.g., "nano" for LoRA
+        time_limit=300,
+        temperature=0.0,
     )
-    
-    predictions = {}
-    
-    for idx, instance in enumerate(dataset):
-        print(f"Processing {idx+1}/{len(dataset)}: {instance['instance_id']}")
-        
-        # Prepare data for nano_agent
-        data = {
+
+    # Prepare inputs for workers
+    inputs: list[dict] = []
+    for instance in dataset:
+        inputs.append({
             "instance_id": instance["instance_id"],
             "problem_statement": instance["problem_statement"],
             "repo": instance["repo"],
             "base_commit": instance["base_commit"],
             "version": instance.get("version", ""),
-            # Add any other fields nano_agent expects
+        })
+
+    predictions: dict[str, dict] = {}
+
+    # Run with a process pool of up to 8 workers
+    max_workers = min(8, len(inputs)) if inputs else 0
+    if max_workers == 0:
+        print("No instances to process.")
+        return
+
+    print(f"Starting processing {len(inputs)} instances with {max_workers} workers...")
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        future_to_instance_id = {
+            executor.submit(_process_one, datum, config): datum["instance_id"] for datum in inputs
         }
-        
-        try:
-            # Run nano_agent
-            result = _process_one(data, config)
-            
-            # Extract the patch/diff from result
-            # Assuming nano_agent returns a dict with 'patch' or 'diff' key
-            patch = result.get("patch", "") or result.get("diff", "") or result.get("model_patch", "")
-            
-            if patch:
-                # Format for SWE-bench submission (dict format)
-                predictions[instance["instance_id"]] = {
-                    "model_patch": patch,
-                    "model_name_or_path": f"nano-agent-{config.model}"
-                }
-                
-        except Exception as e:
-            print(f"Error processing {instance['instance_id']}: {e}")
-            # Still add empty prediction to track attempted instances
-            predictions[instance["instance_id"]] = {
-                "model_patch": "",
-                "model_name_or_path": f"nano-agent-{config.model}"
+
+        completed = 0
+        for future in as_completed(future_to_instance_id):
+            instance_id = future_to_instance_id[future]
+            try:
+                result = future.result()
+            except Exception as e:
+                print(f"Error processing {instance_id}: {e}")
+                result = {}
+
+            # Extract model patch; prefer 'generated_diff' produced by nano_agent
+            patch = (
+                result.get("generated_diff", "")
+                or result.get("patch", "")
+                or result.get("diff", "")
+                or result.get("model_patch", "")
+            )
+
+            predictions[instance_id] = {
+                "model_patch": patch or "",
+                "model_name_or_path": f"nano-agent-{config.model}",
             }
+
+            completed += 1
+            if completed % 5 == 0 or completed == len(inputs):
+                print(f"Progress: {completed}/{len(inputs)} completed")
     
     # Save predictions in SWE-bench format
     output_dir.mkdir(parents=True, exist_ok=True)

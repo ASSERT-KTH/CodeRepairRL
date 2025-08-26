@@ -12,6 +12,7 @@ from peft import LoraConfig as PEFTLoraConfig
 from trl import GRPOConfig as HFGRPOConfig, GRPOTrainer as HFGRPOTrainer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from huggingface_hub import whoami
+from datasets import concatenate_datasets
 
 from src.agents.nano_agent import nano_rollout_func, NanoConfig
 from src.rewards import (
@@ -224,8 +225,15 @@ def main(cfg: Config) -> None:
             categorical_correctness_reward_func,
         ]
         reward_weights = [0.1, 0.2, 0.7]
-    elif cfg.run.task_type == "repo_repair":
-        dataset = get_swe_gym_repo_repair_dataset(dataset_name=cfg.run.dataset_name)
+    elif cfg.run.task_type.startswith("repo_repair"):
+        if cfg.run.task_type == "repo_repair_multilingual":  # a bit hacky
+            dataset_a = get_swe_gym_repo_repair_dataset(dataset_name="SWE-Gym/SWE-Gym").select(750)  # pick 750
+            dataset_b = get_swe_gym_repo_repair_dataset(dataset_name="SWE-bench/SWE-bench_Multilingual").select(250)  # use 250, leave 50 for evals
+            dataset = concatenate_datasets([dataset_a, dataset_b])
+            dataset = dataset.shuffle()
+        else:
+            dataset = get_swe_gym_repo_repair_dataset(dataset_name=cfg.run.dataset_name)
+        
         # Update agent config with model and token_limit
         cfg.agent.model = f"hosted_vllm/{cfg.model.model_name}"
         cfg.agent.token_limit = cfg.grpo.max_prompt_length + cfg.grpo.max_completion_length

@@ -2,52 +2,52 @@
 
 ## Setup
 
-First, build the benchmark container:
+Build the benchmark container (includes vLLM and all deps):
 
 ```bash
 cd benchmarks/
 apptainer build benchmark_container.sif benchmark_container.def
 ```
 
-This container includes vLLM with flash-attn and all benchmark dependencies.
+## Run Flow (no SLURM)
 
-## Running Benchmarks
-
-Each benchmark is a SLURM job that:
-1. Launches a vLLM server with the trained LoRA adapter
-2. Runs before/after comparisons against baseline models
-3. Saves results to JSON
-
-### Tau Bench
+1) Allocate a GPU node:
 ```bash
-sbatch tau_bench/tau_job.sh /path/to/lora/adapter
+salloc --nodes 1 --gpus 1 -C "fat" --time 08:00:00
 ```
 
-### Terminal Bench
+2) Start tmux and launch vLLM in one pane on port 8000:
 ```bash
-sbatch terminal_bench/terminal_job.sh /path/to/lora/adapter
+srun --pty bash -l
+tmux
+```
+then run server
+```bash
+bash benchmarks/vllm.sh Qwen/Qwen3-14B /path/to/nano_lora
+# or without LoRA:
+bash benchmarks/vllm.sh Qwen/Qwen3-14B
 ```
 
-### SWE-bench (with nano_agent)
+3) In another pane, run a benchmark (assumes vLLM is up on http://localhost:8000/v1):
+
+- Tau Bench
 ```bash
-sbatch swe_bench/swe_nano_job.sh /path/to/lora/adapter
+bash benchmarks/tau_bench/tau_job.sh
 ```
 
-### SWE-bench (with minisweagent)
+- SWE-bench (nano_agent)
 ```bash
-sbatch swe_bench/swe_minisweagent_job.sh /path/to/lora/adapter
+bash benchmarks/swe_bench/swe_nano_job.sh
 ```
 
-## vLLM Server Details
-
-The jobs launch vLLM with LoRA support:
-- Base model: Specified in job (e.g., Qwen/Qwen2.5-14B-Instruct)
-- LoRA adapter: Loaded with `--enable-lora --lora-modules nano=/path/to/adapter`
-- Access: Before uses base model name, after uses "nano" as model name
+- SWE-bench (minisweagent)
+```bash
+bash benchmarks/swe_bench/swe_minisweagent_job.sh
+```
 
 ## Results
 
-Results are saved in each benchmark's subdirectory:
-- `tau_bench/results/` - Tau bench metrics
-- `terminal_bench/results/` - Terminal bench scores
-- `swe_bench/results_nano/` - SWE-bench with nano_agent predictions
+Outputs are saved under:
+- `benchmarks/tau_bench/results/`
+- `benchmarks/swe_bench/results_nano/`
+- `benchmarks/swe_bench/results_mini/`

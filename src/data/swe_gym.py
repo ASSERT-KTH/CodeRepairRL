@@ -7,14 +7,14 @@ from datasets import load_dataset, Dataset
 logger = logging.getLogger(__name__)
 
 
-def _get_swe_gym_split(dataset_name: str, curation_partition: bool, curation_ratio: float = 0.25) -> Dataset:
+def _get_swe_gym_split(dataset_name: str, holdout_partition: bool, holdout_ratio: float = 0.25) -> Dataset:
     """
     Internal function to load and split the SWE-Gym dataset.
     
     Args:
         dataset_name: HuggingFace dataset name for SWE-bench
-        curation_partition: If True, return curation partition; if False, return repo repair partition
-        curation_ratio: Ratio of data to allocate to curation partition (default 0.5)
+        holdout_partition: If True, return holdout partition; if False, return repo repair partition
+        holdout_ratio: Ratio of data to allocate to holdout partition (default 0.5)
         
     Returns:
         The requested partition of the dataset
@@ -22,21 +22,22 @@ def _get_swe_gym_split(dataset_name: str, curation_partition: bool, curation_rat
     logger.info(f"Loading SWE-bench dataset: {dataset_name}")
     
     # Load the SWE-bench dataset
-    swe_ds = load_dataset(dataset_name)["train"]  # only has train split
+    swe_ds = load_dataset(dataset_name)
+    swe_ds = swe_ds.get("train") or swe_ds.get("test")
     
     # Create deterministic split based on instance_id hash
-    def should_be_curation(example):
+    def should_be_holdout(example):
         # Use MD5 hash of instance_id for deterministic splitting
         hash_val = int(hashlib.md5(example['instance_id'].encode()).hexdigest(), 16)
-        # Convert to [0, 1] range and compare with curation_ratio
-        return (hash_val / (16**32)) < curation_ratio
+        # Convert to [0, 1] range and compare with holdout_ratio
+        return (hash_val / (16**32)) < holdout_ratio
     
     # Filter based on partition type
-    if curation_partition:
-        swe_ds = swe_ds.filter(should_be_curation)
-        logger.info(f"Creating curation dataset with {len(swe_ds)} examples")
+    if holdout_partition:
+        swe_ds = swe_ds.filter(should_be_holdout)
+        logger.info(f"Creating holdout dataset with {len(swe_ds)} examples")
     else:
-        swe_ds = swe_ds.filter(lambda x: not should_be_curation(x))
+        swe_ds = swe_ds.filter(lambda x: not should_be_holdout(x))
         logger.info(f"Creating repository repair dataset with {len(swe_ds)} examples")
     
     # Add a dummy "prompt" key for compatibility with trl
@@ -47,41 +48,41 @@ def _get_swe_gym_split(dataset_name: str, curation_partition: bool, curation_rat
 # mirroring the other data methods though not strictly doing much
 def get_swe_gym_repo_repair_dataset(
     dataset_name: str,
-    curation_ratio: float = 0.25,
+    holdout_ratio: float = 0.0,
     **kwargs  # absorbs additional arguments required by the other get functions
 ) -> Dataset:
     """
     Load the SWE-bench dataset and convert it to a repository repair dataset.
-    This function returns the non-curation partition of the data for RL/GRPO training.
+    This function returns the non-holdout partition of the data for RL/GRPO training.
     
     Args:
         dataset_name: HuggingFace dataset name for SWE-bench
-        curation_ratio: Ratio of data to allocate to curation partition (default 0.5)
+        holdout_ratio: Ratio of data to allocate to holdout partition (default 0.5)
         
     Returns:
         The processed dataset (repo repair partition)
     """
-    return _get_swe_gym_split(dataset_name, curation_partition=False, curation_ratio=curation_ratio)
+    return _get_swe_gym_split(dataset_name, holdout_partition=False, holdout_ratio=holdout_ratio)
 
-def get_swe_gym_curation_dataset(
+def get_swe_gym_holdout_dataset(
     dataset_name: str,
-    curation_ratio: float = 0.25,
+    holdout_ratio: float = 0.25,
     **kwargs  # absorbs additional arguments required by the other get functions
 ) -> Dataset:
     """
-    Load the SWE-bench dataset for SFT data curation via rejection sampling.
-    This function returns the curation partition of the data, ensuring no overlap 
+    Load the SWE-bench dataset for SFT data holdout via rejection sampling.
+    This function returns the holdout partition of the data, ensuring no overlap 
     with the repository repair dataset. Used by curate_sft_data.py to generate
     high-quality SFT examples through multiple rollouts and filtering.
     
     Args:
         dataset_name: HuggingFace dataset name for SWE-bench
-        curation_ratio: Ratio of data to allocate to curation partition (default 0.5)
+        holdout_ratio: Ratio of data to allocate to holdout partition (default 0.5)
         
     Returns:
-        The processed dataset (curation partition for rejection sampling)
+        The processed dataset (holdout partition for rejection sampling)
     """
-    return _get_swe_gym_split(dataset_name, curation_partition=True, curation_ratio=curation_ratio)
+    return _get_swe_gym_split(dataset_name, holdout_partition=True, holdout_ratio=holdout_ratio)
 
 
 def get_swe_gym_formatted_sft_dataset(
@@ -119,15 +120,15 @@ if __name__ == "__main__":
     print(ds)
     
     # Test the split functions
-    curation_ds = get_swe_gym_curation_dataset()
+    holdout_ds = get_swe_gym_holdout_dataset()
     repair_ds = get_swe_gym_repo_repair_dataset()
     
-    print(f"Curation dataset size: {len(curation_ds)}")
+    print(f"Holdout dataset size: {len(holdout_ds)}")
     print(f"Repo repair dataset size: {len(repair_ds)}")
-    print(f"Total: {len(curation_ds) + len(repair_ds)}")
+    print(f"Total: {len(holdout_ds) + len(repair_ds)}")
     
     # Verify no overlap
-    curation_ids = set(curation_ds['instance_id'])
+    holdout_ids = set(holdout_ds['instance_id'])
     repair_ids = set(repair_ds['instance_id'])
-    overlap = curation_ids.intersection(repair_ids)
+    overlap = holdout_ids.intersection(repair_ids)
     print(f"Overlap between partitions: {len(overlap)} items")
