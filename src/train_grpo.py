@@ -95,17 +95,17 @@ class GRPOConfig:
     disable_dropout: bool = True
 
     # Generation and Training settings
+    num_generations: int = 4
+    steps_per_generation: int = 1
+    num_iterations: int = 1  # inner loop \mu in the algorithm, turned off unless >1
     per_device_train_batch_size: int = 4
     gradient_accumulation_steps: int = 1
-    num_generations: int = 4
-    generation_batch_size: int = 4
     max_prompt_length: int = 256
     max_completion_length: int = 256
 
     # Clipping parameters
     epsilon: float = 0.2
     epsilon_high: Optional[float] = None
-    num_iterations: int = 1  # inner loop \mu in the algorithm, turned off unless >1
 
     # GRPO settings
     beta: float = 0.0  # i.e. no reference_model
