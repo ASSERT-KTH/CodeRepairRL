@@ -10,7 +10,6 @@ max_completion_length: 7168  # but dr_grpo uses this for normalization
 
 # we must fit an entire group per forward pass (per_device_train_batch_size * num_gpus % num_generations == 0)
 num_generations: 8  # group size of GRPO
-generation_batch_size: 8  # but our VLLM server can handle 8
 per_device_train_batch_size: 4  # "default" runs have 2 training GPUs 
 gradient_accumulation_steps: 4
 
