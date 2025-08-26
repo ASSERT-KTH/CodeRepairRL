@@ -1,0 +1,6 @@
+defaults:
+  - repair
+
+task_type: "repo_repair_multilingual"  # a bit hacky I know
+dataset_type: "swe_gym"
+dataset_name: "SWE-Gym/SWE-Gym, SWE-bench/SWE-bench_Multilingual"  # not directly used, but it is logged

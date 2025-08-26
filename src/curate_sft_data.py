@@ -9,7 +9,7 @@ from huggingface_hub import whoami
 from datasets import Dataset, DatasetInfo
 from omegaconf import OmegaConf
 
-from src.data.swe_gym import get_swe_gym_curation_dataset
+from src.data.swe_gym import get_swe_gym_holdout_dataset
 from src.agents.nano_agent import _process_one, NanoConfig
 from src.rewards.diff import unified_diff_similarity_reward_func, unified_diff_file_match_reward_func, unified_diff_similarity_reward_func_test
 
@@ -97,7 +97,7 @@ def main(cfg: Config) -> None:
     
     # Load SWE-Gym dataset
     logger.info("Loading SWE-Gym dataset...")
-    dataset = get_swe_gym_curation_dataset(cfg.curation.input_dataset_name, cfg.curation.curation_ratio)
+    dataset = get_swe_gym_holdout_dataset(cfg.curation.input_dataset_name, cfg.curation.curation_ratio)
     
     # Limit dataset size for testing
     if cfg.curation.max_problems:
