@@ -130,11 +130,10 @@ We provide specialized SLURM scripts for different model sizes, each pre-configu
 
 ```bash
 # For small models (8B), defaults to Qwen/Qwen3-8B
-sbatch scripts/small_grpo_train_job.sh       # Full model training (5 GPUs)
-sbatch scripts/small_grpo_lora_train_job.sh  # LoRA training (2 GPUs)
+sbatch scripts/grpo/small_grpo_lora_train_job.sh grpo.run_name="custom-experiment-name"  # LoRA training (3 GPUs)
 
-# For large models (32B), defaults to Qwen/Qwen3-32B
-sbatch scripts/large_grpo_train_job.sh       # GRPO training (4 GPUs)
+# For medium models (32B), defaults to Qwen/Qwen3-14B
+sbatch scripts/grpo/medium_grpo_lora_train_job.sh grpo.run_name="custom-experiment-name"  # LoRA training (3 GPUs)
 ```
 
 Each script includes pre-tuned GRPO parameters optimized for the corresponding model size category. The scripts support three task types:
@@ -146,13 +145,10 @@ You can customize training with Hydra overrides:
 
 ```bash
 # Change task type
-sbatch scripts/small_grpo_train_job.sh run=detection
+sbatch scripts/grpo/medium_grpo_lora_train_job.sh run=detection
 
 # Use a different model
-sbatch scripts/large_grpo_train_job.sh model=large_qwen
-
-# Override the automatic run name with a custom one
-sbatch scripts/small_grpo_lora_train_job.sh grpo.run_name="custom-experiment-name"
+sbatch scripts/grpo/medium_grpo_train_job.sh model=medium_llama
 ```
 
 ## Local Development

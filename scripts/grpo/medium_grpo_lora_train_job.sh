@@ -19,7 +19,7 @@ MASTER_ADDR=$(hostname -s)
 MASTER_PORT=43001
 
 # Model configuration - use merged SFT model for simplified VLLM pipeline
-MODEL_CONFIG="medium_qwen"
+MODEL_CONFIG="large_qwen_moe"
 MODEL_NAME=$(grep -Po '^model_name: "\K[^"]*' src/conf/model/${MODEL_CONFIG}.yaml)
 # MODEL_NAME="ASSERT-KTH/Qwen3-8B-Nano-SWE-Gym-SFT"
 
@@ -34,13 +34,8 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 crrl.sif \
     trl vllm-serve-async \
     --model "$MODEL_NAME" \
     --max-model-len $VLLM_CONTEXT_LENGTH \
-    --gpu-memory-utilization 0.94 \
-    --async-scheduling \
-    --enable-prefix-caching \
-    --max-num-seqs 32 \
-    --max-num-batched-tokens 8192 \
-    --long-prefill-token-threshold 2048 \
     --disable_log_stats \
+    --gpu-memory-utilization 0.94 \
     --enable_auto_tool_choice \
     --reasoning_parser qwen3 \
     --tool_call_parser hermes \
@@ -50,9 +45,9 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 crrl.sif \
 apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=1,2 crrl.sif accelerate launch \
     --main_process_port $MASTER_PORT \
     --num_processes 2 \
-    --config_file scripts/deepspeed/zero2.yaml \
+    --config_file scripts/deepspeed/zero3.yaml \
     --module src.train_grpo -- \
-        run=repo_repair \
+        run=repo_repair_multilingual \
         model=$MODEL_CONFIG \
         model.model_name=$MODEL_NAME \
         agent.time_limit=60 \

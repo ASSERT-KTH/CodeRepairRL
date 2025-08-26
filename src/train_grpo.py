@@ -227,8 +227,8 @@ def main(cfg: Config) -> None:
         reward_weights = [0.1, 0.2, 0.7]
     elif cfg.run.task_type.startswith("repo_repair"):
         if cfg.run.task_type == "repo_repair_multilingual":  # a bit hacky
-            dataset_a = get_swe_gym_repo_repair_dataset(dataset_name="SWE-Gym/SWE-Gym").select(750)  # pick 750
-            dataset_b = get_swe_gym_repo_repair_dataset(dataset_name="SWE-bench/SWE-bench_Multilingual").select(250)  # use 250, leave 50 for evals
+            dataset_a = get_swe_gym_repo_repair_dataset(dataset_name="SWE-Gym/SWE-Gym").select(range(750))  # pick 750
+            dataset_b = get_swe_gym_repo_repair_dataset(dataset_name="SWE-bench/SWE-bench_Multilingual").select(range(250))  # use 250, leave 50 for evals
             dataset = concatenate_datasets([dataset_a, dataset_b])
             dataset = dataset.shuffle()
         else:
