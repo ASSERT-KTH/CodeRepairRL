@@ -74,6 +74,8 @@ class GRPOConfig:
     # vLLM generation settings
     use_vllm: bool = True
     vllm_mode: str = "async_server"
+    vllm_server_host: str = "127.0.0.1"
+
     # whether completions are multi-turn or single-turn
     multi_turn: bool = True
     # whether to mask tool responses in the loss

@@ -2,14 +2,3 @@ defaults:
   - small_qwen
 
 model_name: "Qwen/Qwen3-30B-A3B-Instruct-2507"
-target_modules:
-  - "q_proj"
-  - "k_proj"
-  - "v_proj"
-  - "o_proj"
-  - "gate_proj"
-  - "up_proj"
-  - "down_proj"
-  - "moe_gate"
-  - "router"
-  - "routing"

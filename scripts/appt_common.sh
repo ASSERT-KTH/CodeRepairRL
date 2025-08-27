@@ -5,8 +5,7 @@
 
 if [[ -z "${CRRL_WORKDIR:-}" ]]; then
     echo "[ERROR] CRRL_WORKDIR is not set. Please set it to a writable path, e.g.:" >&2
-    echo "        export CRRL_WORKDIR=\"$HOME/crrl_work\"" >&2
-    echo "     or export CRRL_WORKDIR=\"/proj/<project>/users/<user>/\"" >&2
+    echo "     export CRRL_WORKDIR=\"/proj/<project>/users/<user>/\"" >&2
     return 1 2>/dev/null || exit 1
 fi
 
@@ -26,6 +25,8 @@ APPT_COMMON=(
   --env "SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt"
   --env "PYTHONNOUSERSITE=1"
   --env "VLLM_ALLOW_INSECURE_SERIALIZATION=1"
+  --env "TORCH_NCCL_ASYNC_ERROR_HANDLING=1"
+  --env "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True"
 )
 
 # Export as a flat string for convenient interpolation in scripts

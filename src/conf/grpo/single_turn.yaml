@@ -1,6 +1,7 @@
 # vLLM generation settings
 use_vllm: true
 vllm_mode: "server"
+vllm_server_host: "127.0.0.1"
 
 # whether completions are multi-turn or single-turn
 multi_turn: false

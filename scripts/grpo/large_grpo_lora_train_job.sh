@@ -7,18 +7,14 @@
 #SBATCH --time=48:00:00
 #SBATCH -C "fat"
 
+
+# Large GRPO train job, 6 fat GPUs, 2 running vLLM, 4 training
+
 # Apptainer common runtime configuration (requires CRRL_WORKDIR)
 source scripts/appt_common.sh
 
-# Large GRPO training job, 4 GPUs, 2 running vLLM, 2 training
 
-# This was crucial to find errors when running distributed training, i.e. quit on deadlock instead of hanging
-export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
-export NCCL_DEBUG=INFO
-MASTER_ADDR=$(hostname -s)
 MASTER_PORT=43001
-
-# Model configuration - use merged SFT model for simplified VLLM pipeline
 MODEL_CONFIG="large_qwen"
 MODEL_NAME=$(grep -Po '^model_name: "\K[^"]*' src/conf/model/${MODEL_CONFIG}.yaml)
 
@@ -42,25 +38,24 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0,1 crrl.sif \
     --tensor_parallel_size 2 \
     &  # & makes it run in the background
 
-sleep 100  # give the vLLM server a bit more time to start
+sleep 200  # give the vLLM server a bit more time to start
 
 apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=2,3,4,5 crrl.sif accelerate launch \
+    --main_process_port $MASTER_PORT \
     --config_file scripts/deepspeed/zero3.yaml \
     --num_processes 4 \
     --module src.train_grpo -- \
-        run=repo_repair \
-        run.dataset_name="SWE-Gym/SWE-Gym" \
+        run=repo_repair_multilingual \
         model=$MODEL_CONFIG \
         model.model_name=$MODEL_NAME \
         agent.time_limit=80 \
         grpo=multi_turn_gspo \
         grpo.max_prompt_length=$MAX_PROMPT_LENGTH \
         grpo.max_completion_length=$MAX_COMPLETION_LENGTH \
-        grpo.num_train_epochs=2 \
         grpo.num_generations=4 \
-        grpo.generation_batch_size=8 \
+        grpo.steps_per_generation=2 \
         grpo.per_device_train_batch_size=1 \
-        grpo.gradient_accumulation_steps=8 \
+        grpo.gradient_accumulation_steps=4 \
         grpo.optim="adamw_torch" \
         "$@"  # pass any additional arguments
     
