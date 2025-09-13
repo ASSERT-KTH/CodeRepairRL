@@ -1,6 +1,7 @@
 import os
 import logging
 from functools import partial
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -60,6 +61,7 @@ class ModelConfig:
     # Transformers configuration
     model_name: str = "Qwen/Qwen3-8B"
     attn_implementation: str = "flash_attention_3"  # only on >Hopper GPUs
+    chat_template: Optional[str] = None  # optional path to jinja chat template
     # LoRA configuration
     lora: bool = True
     r: int = 32
@@ -98,7 +100,7 @@ class GRPOConfig:
 
     # Generation and Training settings
     num_generations: int = 4
-    steps_per_generation: int = 1
+    generation_batch_size: int = 4
     num_iterations: int = 1  # inner loop \mu in the algorithm, turned off unless >1
     per_device_train_batch_size: int = 4
     gradient_accumulation_steps: int = 1
@@ -184,7 +186,10 @@ def main(cfg: Config) -> None:
     # Load base model
     logger.info(f"Loading model: {cfg.model.model_name}")
     model = AutoModelForCausalLM.from_pretrained(cfg.model.model_name, attn_implementation=cfg.model.attn_implementation, torch_dtype=precision_mode)
-    tokenizer = AutoTokenizer.from_pretrained(cfg.model.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(
+        cfg.model.model_name,
+        chat_template=Path(cfg.model.chat_template).read_text(encoding="utf-8") if cfg.model.chat_template else None
+    )
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"  # by padding a batch of prompts on the left side we can generate many completions in parallel (padding tokens are masked away)
 

@@ -1,0 +1,5 @@
+defaults:
+  - small_qwen
+
+model_name: "nvidia/Llama-3.1-Nemotron-Nano-8B-v1"
+chat_template: "src/chat_templates/tool_chat_template_llama3.1_json.jinja"

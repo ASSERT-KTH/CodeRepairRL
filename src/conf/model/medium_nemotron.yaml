@@ -1,4 +1,0 @@
-defaults:
-  - small_qwen
-
-model_name: "nvidia/NVIDIA-Nemotron-Nano-12B-v2"

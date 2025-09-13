@@ -13,10 +13,23 @@
 # Apptainer common runtime configuration (requires CRRL_WORKDIR)
 source scripts/appt_common.sh
 
+# MODEL_CONFIG can be provided via env or as --model_config <name>
+MODEL_CONFIG="${MODEL_CONFIG:-small_qwen}"
+if [[ "${1:-}" == --model_config=* ]]; then MODEL_CONFIG="${1#*=}"; shift; fi
+if [[ "${1:-}" == --model_config ]]; then MODEL_CONFIG="${2:?}"; shift 2; fi
+
 
 MASTER_PORT=43001
-MODEL_CONFIG="small_qwen"
-MODEL_NAME=$(grep -Po '^model_name: "\K[^"]*' src/conf/model/${MODEL_CONFIG}.yaml)
+MODEL_NAME=$(awk -F '"' '/^model_name:/ {print $2; exit}' "src/conf/model/${MODEL_CONFIG}.yaml")
+
+# Minimal parser selection based on model name and optional chat template
+RP=""; TP=""; CT=""
+case "${MODEL_NAME,,}" in
+  *qwen*)     RP="--reasoning_parser qwen3"; TP="--tool_call_parser hermes";;
+  *nemotron*) TP="--tool_call_parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
+  *llama*)    TP="--tool_call_parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
+  *)          TP="--tool_call_parser hermes";;
+esac
 
 # Context window configuration
 MAX_PROMPT_LENGTH=1024
@@ -32,8 +45,8 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 crrl.sif \
     --disable_log_stats \
     --gpu-memory-utilization 0.94 \
     --enable_auto_tool_choice \
-    --reasoning_parser qwen3 \
-    --tool_call_parser hermes \
+    $CT \
+    $RP $TP \
     &
 
 
@@ -44,7 +57,6 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=1 crrl.sif accelerate lau
         run=repo_repair \
         run.dataset_name="SWE-Gym/SWE-Gym-Lite" \
         model=$MODEL_CONFIG \
-        model.model_name=$MODEL_NAME \
         agent.time_limit=60 \
         grpo=multi_turn_gspo \
         grpo.max_prompt_length=$MAX_PROMPT_LENGTH \
