@@ -1,0 +1,4 @@
+defaults:
+  - small_qwen
+
+model_name: "google/gemma-3-27b-it"

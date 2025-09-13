@@ -1,0 +1,4 @@
+defaults:
+  - small_qwen
+
+model_name: "microsoft/phi-4"
