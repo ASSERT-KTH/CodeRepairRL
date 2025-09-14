@@ -14,21 +14,10 @@
 source scripts/appt_common.sh
 
 # MODEL_CONFIG can be provided via env or as --model_config <name>
-MODEL_CONFIG="${MODEL_CONFIG:-large_qwen}"
-if [[ "${1:-}" == --model_config=* ]]; then MODEL_CONFIG="${1#*=}"; shift; fi
-if [[ "${1:-}" == --model_config ]]; then MODEL_CONFIG="${2:?}"; shift 2; fi
-
+MODEL_CONFIG="large_qwen"
 
 MASTER_PORT=43001
 MODEL_NAME=$(awk -F '"' '/^model_name:/ {print $2; exit}' "src/conf/model/${MODEL_CONFIG}.yaml")
-
-RP=""; TP=""; CT=""
-case "${MODEL_NAME,,}" in
-  *qwen*)     RP="--reasoning_parser qwen3"; TP="--tool_call_parser hermes";;
-  *nemotron*) TP="--tool_call_parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
-  *llama*)    TP="--tool_call_parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
-  *)          TP="--tool_call_parser hermes";;
-esac
 
 # Context window configuration, this defines our compute requirements more than anything else
 MAX_PROMPT_LENGTH=1024
@@ -45,8 +34,8 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0,1 crrl.sif \
     --gpu_memory_utilization 0.8 \
     --max_num_seqs 8 \
     --enable_auto_tool_choice \
-    $CT \
-    $RP $TP \
+    --reasoning_parser qwen3 \
+    --tool_call_parser hermes \
     --tensor_parallel_size 2 \
     --disable_custom_all_reduce \
     --enforce_eager \
