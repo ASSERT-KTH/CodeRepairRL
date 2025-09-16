@@ -35,14 +35,28 @@ bash benchmarks/vllm.sh Qwen/Qwen3-14B
 bash benchmarks/tau_bench/tau_job.sh
 ```
 
-- SWE-bench (nano_agent)
+### SWE-bench (two-phase: GPU predict -> CPU evaluate)
+
+On the GPU node (to generate predictions JSONL):
 ```bash
 bash benchmarks/swe_bench/swe_nano_job.sh
+# or
+bash benchmarks/swe_bench/swe_minisweagent_job.sh
+# or
+bash benchmarks/swe_bench/swe_aider_job.sh
 ```
 
-- SWE-bench (minisweagent)
+Then on a CPU server with Docker and the SWE-bench harness installed, run evaluation:
 ```bash
-bash benchmarks/swe_bench/swe_minisweagent_job.sh
+# Install harness once on CPU machine:
+# git clone https://github.com/princeton-nlp/SWE-bench
+# cd SWE-bench && pip install -e .
+
+# Evaluate a preds.jsonl file (example for nano):
+benchmarks/swe_bench/run_harness_eval.sh \
+  --subset verified --split test \
+  --preds /ABS/PATH/TO/repo/benchmarks/swe_bench/results_nano/preds.jsonl \
+  --run-id nano_test
 ```
 
 ## Results
@@ -51,3 +65,4 @@ Outputs are saved under:
 - `benchmarks/tau_bench/results/`
 - `benchmarks/swe_bench/results_nano/`
 - `benchmarks/swe_bench/results_mini/`
+Evaluation logs and reports (from the harness) will be written under the harness working directory (e.g., `evaluation_results/`). See the harness docs for details.
