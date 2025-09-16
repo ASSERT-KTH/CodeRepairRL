@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 Run SWE-bench evaluation using nano_agent.py
+
+This file intentionally mirrors the interface of run_aider_eval.py to keep
+eval flows consistent across agents.
 """
 
 import json
@@ -94,14 +97,14 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
     
     print(f"Saved predictions to {preds_file}")
     
-    # Also save in JSONL format for local evaluation
+    # Also save in JSONL format for local evaluation (SWE-bench harness schema)
     jsonl_file = output_dir / "preds.jsonl"
     with open(jsonl_file, "w") as f:
         for instance_id, pred_data in predictions.items():
             obj = {
                 "instance_id": instance_id,
-                "model": pred_data["model_name_or_path"],
-                "prediction": pred_data["model_patch"]
+                "model_name_or_path": pred_data["model_name_or_path"],
+                "model_patch": pred_data["model_patch"],
             }
             f.write(json.dumps(obj, ensure_ascii=False) + "\n")
     

@@ -24,6 +24,8 @@ From: vllm/vllm-openai:v0.10.0
     # Nano
     pip install nano-agent gitpython
     # Mini-Swe-Agent and SWE Bench
-    pip install mini-swe-agent sb-cli
+    pip install mini-swe-agent
+    # Aider
+    pip install aider-install aider-chat
     # Misc
     pip install openai anthropic requests jsonlines datasets
