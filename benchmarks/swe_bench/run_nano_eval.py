@@ -126,7 +126,7 @@ def main():
                         help="Output directory for results")
     parser.add_argument("--subset", default="verified",
                         help="SWE-bench subset (verified, lite, full)")
-    parser.add_argument("--split", default="dev",
+    parser.add_argument("--split", default="test",
                         help="Dataset split")
     parser.add_argument("--slice", default=":25",
                         help="Slice of dataset to run (e.g., :25 for first 25)")
