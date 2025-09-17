@@ -33,8 +33,10 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
     config = NanoConfig(
         api_base=endpoint,
         model=model_name,  # e.g., "nano" for LoRA
-        time_limit=300,
+        token_limit=32000,
+        time_limit=600,
         temperature=0.0,
+        tool_limit=200,
     )
 
     # Prepare inputs for workers
