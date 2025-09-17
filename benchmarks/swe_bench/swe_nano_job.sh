@@ -8,7 +8,7 @@ ENDPOINT="http://localhost:8000/v1"
 OUTPUT_DIR="swe_bench/results_nano"
 SUBSET="verified"
 SPLIT="test"
-SLICE=":1"
+SLICE=":25"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
