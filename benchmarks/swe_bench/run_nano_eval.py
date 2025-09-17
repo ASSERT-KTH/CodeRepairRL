@@ -90,16 +90,8 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
             if completed % 5 == 0 or completed == len(inputs):
                 print(f"Progress: {completed}/{len(inputs)} completed")
     
-    # Save predictions in SWE-bench format
+    # Save predictions in JSONL format for SWE-bench harness
     output_dir.mkdir(parents=True, exist_ok=True)
-    preds_file = output_dir / "preds.json"
-    
-    with open(preds_file, "w") as f:
-        json.dump(predictions, f, indent=2, ensure_ascii=False)
-    
-    print(f"Saved predictions to {preds_file}")
-    
-    # Also save in JSONL format for local evaluation (SWE-bench harness schema)
     jsonl_file = output_dir / "preds.jsonl"
     with open(jsonl_file, "w") as f:
         for instance_id, pred_data in predictions.items():
@@ -110,7 +102,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
             }
             f.write(json.dumps(obj, ensure_ascii=False) + "\n")
     
-    print(f"Also saved JSONL format to {jsonl_file}")
+    print(f"Saved JSONL format to {jsonl_file}")
     
     # Quick validation - check if patches can apply
     valid_count = 0
