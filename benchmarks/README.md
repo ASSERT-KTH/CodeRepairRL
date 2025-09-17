@@ -9,6 +9,37 @@ cd benchmarks/
 apptainer build benchmark_container.sif benchmark_container.def
 ```
 
+## Run Flow (with SLURM, one-shot)
+
+Submit a single SLURM job that launches vLLM (optional) and runs the SWE-bench Nano evaluation to produce only `preds.jsonl`.
+
+1) Ensure `CRRL_WORKDIR` is set (used by Apptainer bindings and caches):
+```bash
+export CRRL_WORKDIR="/proj/<project>/users/<user>"
+```
+
+2) Submit the job (starts its own vLLM server):
+```bash
+sbatch benchmarks/swe_nano_infer_job.sh \
+  --base-model Qwen/Qwen3-14B \
+  --subset verified --split test --slice :25
+# optionally add LoRA (adapter name "nano")
+sbatch benchmarks/swe_nano_infer_job.sh \
+  --base-model Qwen/Qwen3-14B \
+  --lora-path /path/to/nano_lora \
+  --subset verified --split test --slice :25
+```
+
+3) If you already have a vLLM server running, skip starting a new one:
+```bash
+sbatch benchmarks/swe_nano_infer_job.sh \
+  --no-server \
+  --model-name hosted_vllm/Qwen/Qwen3-14B \
+  --subset verified --split test --slice :25
+```
+
+Outputs: `benchmarks/swe_bench/results_nano/preds.jsonl`
+
 ## Run Flow (no SLURM)
 
 1) Allocate a GPU node:
@@ -23,9 +54,9 @@ tmux
 ```
 then run server
 ```bash
-bash benchmarks/vllm.sh Qwen/Qwen3-14B /path/to/nano_lora
+bash benchmarks/vllm.sh Qwen/Qwen3-8B /path/to/nano_lora
 # or without LoRA:
-bash benchmarks/vllm.sh Qwen/Qwen3-14B
+bash benchmarks/vllm.sh Qwen/Qwen3-8B
 ```
 
 3) In another pane, run a benchmark (assumes vLLM is up on http://localhost:8000/v1):
@@ -39,18 +70,17 @@ bash benchmarks/tau_bench/tau_job.sh
 
 On the GPU node (to generate predictions JSONL):
 ```bash
-bash benchmarks/swe_bench/swe_nano_job.sh
+bash benchmarks/swe_bench/swe_nano_job.sh --model-name hosted_vllm/Qwen/Qwen3-8B
 # or
-bash benchmarks/swe_bench/swe_minisweagent_job.sh
+bash benchmarks/swe_bench/swe_minisweagent_job.sh --model-name hosted_vllm/Qwen/Qwen3-8B
 # or
-bash benchmarks/swe_bench/swe_aider_job.sh
+bash benchmarks/swe_bench/swe_aider_job.sh --model-name hosted_vllm/Qwen/Qwen3-8B
 ```
 
 Then on a CPU server with Docker and the SWE-bench harness installed, run evaluation:
 ```bash
 # Install harness once on CPU machine:
-# git clone https://github.com/princeton-nlp/SWE-bench
-# cd SWE-bench && pip install -e .
+pip install swebench
 
 # Evaluate a preds.jsonl file (example for nano):
 benchmarks/swe_bench/run_harness_eval.sh \
