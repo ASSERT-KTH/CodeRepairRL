@@ -83,7 +83,7 @@ fi
 mkdir -p "$(dirname "logs/.keep")" "$OUTPUT_DIR"
 
 wait_for_vllm() {
-  local url="$1"; local -i tries=120
+  local url="$1"; local -i tries=180
   while (( tries-- > 0 )); do
     code=$(curl -s -o /dev/null -w "%{http_code}" "$url/models" || true)
     if [[ "$code" == "200" ]]; then return 0; fi
