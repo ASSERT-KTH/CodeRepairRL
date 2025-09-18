@@ -4,8 +4,8 @@
 #SBATCH --error=logs/swe_nano_%A_%a.err
 #SBATCH --nodes=1
 #SBATCH --gpus 1
-#SBATCH --time=08:00:00
-#SBATCH -C "fat"
+#SBATCH --time=00:30:00
+#SBATCH -C "thin"
 #SBATCH --array=0-9
 
 set -euo pipefail
