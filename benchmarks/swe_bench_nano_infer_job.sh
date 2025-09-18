@@ -17,7 +17,8 @@ source scripts/appt_common.sh
 BASE_MODEL="Qwen/Qwen3-8B"     # HF model to serve with vLLM
 LORA_PATH=""                    # Optional LoRA path; enables adapter name "nano" if set
 MODEL_NAME=""                   # Model name passed to the agent; auto-derived if empty
-OUTPUT_DIR="swe_bench/results_nano"
+SCAFFOLD="nano-agent"           # Scaffold identifier for run tagging
+OUTPUT_BASE_DIR="swe_bench/results"
 SUBSET="verified"
 SPLIT="test"
 SLICE=""
@@ -34,13 +35,15 @@ while [[ $# -gt 0 ]]; do
     --model-name)
       MODEL_NAME="${2:?}"; shift 2;;
     --output-dir)
-      OUTPUT_DIR="${2:?}"; shift 2;;
+      OUTPUT_BASE_DIR="${2:?}"; shift 2;;
     --subset)
       SUBSET="${2:?}"; shift 2;;
     --split)
       SPLIT="${2:?}"; shift 2;;
     --slice)
       SLICE="${2:?}"; shift 2;;
+    --scaffold)
+      SCAFFOLD="${2:?}"; shift 2;;
     --port)
       PORT="${2:?}"; shift 2;;
     --no-server)
@@ -66,9 +69,6 @@ if [[ $START_SERVER -eq 1 ]]; then
   PORT=$(( PORT + TASK_ID ))
 fi
 
-# Write results to per-shard directory
-OUTPUT_DIR="${OUTPUT_DIR}/shard_${TASK_ID}"
-
 ENDPOINT="http://localhost:${PORT}/v1"
 
 # Derive MODEL_NAME if not explicitly provided
@@ -79,6 +79,26 @@ if [[ -z "$MODEL_NAME" ]]; then
     MODEL_NAME="hosted_vllm/${BASE_MODEL}"
   fi
 fi
+
+# Build a descriptive run tag: <scaffold>-<model_tag>
+sanitize_tag() {
+  local s="$1"
+  s="${s//\//__}"
+  s="${s// /_}"
+  s=$(printf '%s' "$s" | sed -E 's/[^A-Za-z0-9._-]+/_/g; s/_+/_/g; s/^_+|_+$//g')
+  printf '%s' "$s"
+}
+
+if [[ -n "$LORA_PATH" ]]; then
+  BASE_TAG=$(sanitize_tag "$BASE_MODEL")
+  ADAPTER_TAG=$(sanitize_tag "$(basename "$LORA_PATH")")
+  MODEL_TAG="${BASE_TAG}__lora__${ADAPTER_TAG}"
+else
+  MODEL_TAG=$(sanitize_tag "$MODEL_NAME")
+fi
+
+RUN_TAG="${SCAFFOLD}-${MODEL_TAG}"
+OUTPUT_DIR="${OUTPUT_BASE_DIR}/${RUN_TAG}/shard_${TASK_ID}"
 
 mkdir -p "$(dirname "logs/.keep")" "$OUTPUT_DIR"
 
