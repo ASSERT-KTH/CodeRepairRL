@@ -21,21 +21,18 @@ export CRRL_WORKDIR="/proj/<project>/users/<user>"
 2) Submit the job (starts its own vLLM server):
 ```bash
 sbatch benchmarks/swe_nano_infer_job.sh \
-  --base-model Qwen/Qwen3-14B \
-  --subset verified --split test --slice :25
+  --base-model Qwen/Qwen3-8B
 # optionally add LoRA (adapter name "nano")
 sbatch benchmarks/swe_nano_infer_job.sh \
-  --base-model Qwen/Qwen3-14B \
-  --lora-path /path/to/nano_lora \
-  --subset verified --split test --slice :25
+  --base-model Qwen/Qwen3-8B \
+  --lora-path /path/to/nano_lora
 ```
 
 3) If you already have a vLLM server running, skip starting a new one:
 ```bash
 sbatch benchmarks/swe_nano_infer_job.sh \
   --no-server \
-  --model-name hosted_vllm/Qwen/Qwen3-14B \
-  --subset verified --split test --slice :25
+  --model-name hosted_vllm/Qwen/Qwen3-8B
 ```
 
 Outputs: `benchmarks/swe_bench/results_nano/preds.jsonl`

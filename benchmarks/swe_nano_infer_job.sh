@@ -1,11 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=crrl-swe-nano
-#SBATCH --output=logs/swe_nano_%j.out
-#SBATCH --error=logs/swe_nano_%j.err
+#SBATCH --output=logs/swe_nano_%A_%a.out
+#SBATCH --error=logs/swe_nano_%A_%a.err
 #SBATCH --nodes=1
 #SBATCH --gpus 1
 #SBATCH --time=08:00:00
 #SBATCH -C "fat"
+#SBATCH --array=0-9
 
 set -euo pipefail
 
@@ -19,7 +20,7 @@ MODEL_NAME=""                   # Model name passed to the agent; auto-derived i
 OUTPUT_DIR="swe_bench/results_nano"
 SUBSET="verified"
 SPLIT="test"
-SLICE=":"
+SLICE=""
 PORT=8000
 SIF="benchmarks/benchmark_container.sif"
 START_SERVER=1
@@ -48,6 +49,25 @@ while [[ $# -gt 0 ]]; do
       echo "Unknown arg: $1"; exit 1;;
   esac
 done
+
+# Derive slice and per-task settings when running as a SLURM array
+TASK_ID=${SLURM_ARRAY_TASK_ID:-0}
+SHARD_SIZE=50
+
+# Auto-compute slice if not explicitly provided
+if [[ -z "$SLICE" ]]; then
+  START=$(( TASK_ID * SHARD_SIZE ))
+  END=$(( START + SHARD_SIZE ))
+  SLICE="${START}:${END}"
+fi
+
+# Offset port to avoid conflicts if multiple tasks land on the same node
+if [[ $START_SERVER -eq 1 ]]; then
+  PORT=$(( PORT + TASK_ID ))
+fi
+
+# Write results to per-shard directory
+OUTPUT_DIR="${OUTPUT_DIR}/shard_${TASK_ID}"
 
 ENDPOINT="http://localhost:${PORT}/v1"
 
