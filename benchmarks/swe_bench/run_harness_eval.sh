@@ -10,7 +10,7 @@ set -euo pipefail
 #     [--max-workers 8]
 #
 # Requirements (on this CPU server):
-#   pip install -e git+https://github.com/princeton-nlp/SWE-bench.git#egg=SWE-bench
+#   pip install swebench
 #   Docker installed and running
 
 subset="verified"
