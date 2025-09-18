@@ -27,11 +27,13 @@ from vllm.utils import random_uuid
 logger = init_logger(__name__)
 
 
-@ToolParserManager.register_module("llama_nemotron_json")
+@ToolParserManager.register_module("llama3_nemotron_json")  # vLLM v10 bug that validates tool-call-parser before injecting our one, so we override
 class LlamaNemotronJSONToolParser(ToolParser):
 
     def __init__(self, tokenizer: AnyTokenizer):
         super().__init__(tokenizer)
+        
+        logger.info(f"LlamaNemotronJSONToolParser initialized with tokenizer: {tokenizer}")
 
         self.current_tool_name_sent: bool = False
         self.prev_tool_call_arr: list[dict] = []
@@ -48,8 +50,12 @@ class LlamaNemotronJSONToolParser(ToolParser):
         model_output: str,
         request: ChatCompletionRequest,
     ) -> ExtractedToolCallInformation:
+        
+        logger.info(f"Extracting tool calls from model output: {model_output}")
 
         if self.tool_call_start_token not in model_output:
+            logger.info(f"No tool call start token found in model output")
+            logger.info(f"Returning ExtractedToolCallInformation(tools_called=False, tool_calls=[], content={model_output})")
             return ExtractedToolCallInformation(
                 tools_called=False,
                 tool_calls=[],
@@ -59,6 +65,7 @@ class LlamaNemotronJSONToolParser(ToolParser):
         else:
 
             try:
+                logger.info(f"Tool call start token found in model output")
                 str_tool_calls = self.tool_call_regex.findall(model_output)[0].strip()
                 if not str_tool_calls.startswith("["):
                     str_tool_calls = "[" + str_tool_calls
@@ -68,6 +75,7 @@ class LlamaNemotronJSONToolParser(ToolParser):
                 tool_calls = []
                 for tool_call in json_tool_calls:
                     try:
+                        logger.info(f"Adding tool call: {tool_call}")
                         tool_calls.append(ToolCall(
                             type="function",
                             function=FunctionCall(
@@ -77,10 +85,11 @@ class LlamaNemotronJSONToolParser(ToolParser):
                             ),
                         ))
                     except:
+                        logger.info(f"Error adding tool call: {tool_call}")
                         continue
 
                 content = model_output[:model_output.rfind(self.tool_call_start_token)]
-
+                logger.info(f"Content: {content}")
                 return ExtractedToolCallInformation(
                     tools_called=True,
                     tool_calls=tool_calls,
@@ -89,6 +98,7 @@ class LlamaNemotronJSONToolParser(ToolParser):
 
             except Exception:
                 logger.exception(f"Error in extracting tool call from response. Response: {model_output}")
+                logger.info(f"Returning ExtractedToolCallInformation(tools_called=False, tool_calls=[], content={model_output})")
                 return ExtractedToolCallInformation(
                     tools_called=False,
                     tool_calls=[],

@@ -14,7 +14,7 @@
 source scripts/appt_common.sh
 
 # MODEL_CONFIG can be provided via env or as --model_config <name>
-MODEL_CONFIG="${MODEL_CONFIG:-medium_phi}"
+MODEL_CONFIG="${MODEL_CONFIG:-medium_qwen}"
 if [[ "${1:-}" == --model_config=* ]]; then MODEL_CONFIG="${1#*=}"; shift; fi
 if [[ "${1:-}" == --model_config ]]; then MODEL_CONFIG="${2:?}"; shift 2; fi
 
@@ -23,9 +23,10 @@ MASTER_PORT=43001
 MODEL_NAME=$(awk -F '"' '/^model_name:/ {print $2; exit}' "src/conf/model/${MODEL_CONFIG}.yaml")
 
 RP=""; TP=""; CT=""; PLUG=""
-case "${MODEL_NAME,,}" in
+case "${MODEL_CONFIG,,}" in
   *qwen*)     RP="--reasoning_parser qwen3"; TP="--tool_call_parser hermes";;
-  *nemotron*) TP="--tool_call_parser llama_nemotron_json"; CT="--chat-template src/chat_templates/llama_nemotron_nano_generic_tool_calling.jinja"; PLUG="--tool_parser_plugin ./src/chat_templates/llama_nemotron_nano_toolcall_parser.py";;
+  # xlam isn't the actual parser we use, is a workaround for a vLLM bug that validates tool-call-parser before injecting our one, so we override
+  *nemotron*) TP="--tool_call_parser llama3_nemotron_json"; CT="--chat-template src/chat_templates/llama_nemotron_nano_generic_tool_calling.jinja"; PLUG="--tool_parser_plugin src/chat_templates/llama_nemotron_nano_toolcall_parser.py";;
   *llama*)    TP="--tool_call_parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
   *mistral*)  TP="--tool_call_parser mistral"; CT="--chat-template src/chat_templates/tool_chat_template_mistral.jinja";;
   *)          TP="--tool_call_parser hermes";;

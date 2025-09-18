@@ -16,7 +16,6 @@ fi
 # - --env: set all required environment variables inside container
 APPT_COMMON=(
   --nv
-  --cleanenv
   --bind "${CRRL_WORKDIR}:${CRRL_WORKDIR}"
   --env "PROJECT_DIR=${CRRL_WORKDIR}"
   --env "HF_HOME=${CRRL_WORKDIR}/.hf"
@@ -27,6 +26,13 @@ APPT_COMMON=(
   --env "VLLM_ALLOW_INSECURE_SERIALIZATION=1"
   --env "TORCH_NCCL_ASYNC_ERROR_HANDLING=1"
   --env "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True"
+  # --env "NCCL_DEBUG=INFO"
+  # --env "NCCL_DEBUG_SUBSYS=INIT,COLL"
+  # --env "NCCL_ASYNC_ERROR_HANDLING=1"
+  # --env "TORCH_NCCL_TRACE_BUFFER_SIZE=1048576"
+  # --env "TORCH_NCCL_DUMP_ON_TIMEOUT=1"
+  # --env "TORCH_NCCL_DESYNC_DEBUG=DETAIL"
+  # --env "TORCH_NCCL_BLOCKING_WAIT=1"
 )
 
 # Export as a flat string for convenient interpolation in scripts
