@@ -25,9 +25,25 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
     # Load SWE-bench dataset
     dataset = load_dataset(f"princeton-nlp/SWE-bench_{subset}", split=split)
 
-    # Parse slice (e.g., ":25" means first 25)
-    if slice_spec.startswith(":"):
-        dataset = dataset.select(range(int(slice_spec[1:])))
+    # Parse slice
+    # Supported forms:
+    #   ":N"        -> first N instances
+    #   "start:end" -> instances in [start, end) zero-based half-open interval
+    #   "start:count" when suffixed with "+" as in "start+count" is NOT supported to avoid ambiguity
+    if slice_spec:
+        if slice_spec.startswith(":"):
+            # first N
+            dataset = dataset.select(range(int(slice_spec[1:])))
+        elif ":" in slice_spec:
+            # start:end range
+            start_str, end_str = slice_spec.split(":", 1)
+            start_idx = int(start_str)
+            end_idx = int(end_str)
+            if start_idx < 0 or end_idx < 0:
+                raise ValueError("slice must be non-negative indices")
+            if end_idx < start_idx:
+                raise ValueError("slice end must be >= start")
+            dataset = dataset.select(range(start_idx, min(end_idx, len(dataset))))
 
     # Setup config for nano_agent
     config = NanoConfig(
@@ -126,7 +142,7 @@ def main():
     parser.add_argument("--split", default="test",
                         help="Dataset split")
     parser.add_argument("--slice", default=":25",
-                        help="Slice of dataset to run (e.g., :25 for first 25)")
+                        help="Slice to run. Forms: :N (first N) or start:end (half-open)")
     
     args = parser.parse_args()
     
