@@ -16,7 +16,7 @@ CMD=(apptainer exec --nv "$SIF" vllm serve "$MODEL" \
 if [[ -n "$LORA_PATH" ]]; then
   ADAPTER_BASENAME="$(basename "$LORA_PATH")"
   LORA_ADAPTER_NAME=$(printf '%s' "$ADAPTER_BASENAME" | sed -E 's/[^A-Za-z0-9._-]+/_/g; s/_+/_/g; s/^_+|_+$//g')
-  CMD+=(--enable-lora --lora-modules "$LORA_ADAPTER_NAME=$LORA_PATH")
+  CMD+=(--max-lora-rank 32 --enable-lora --lora-modules "$LORA_ADAPTER_NAME=$LORA_PATH")
 fi
 
 "${CMD[@]}"
