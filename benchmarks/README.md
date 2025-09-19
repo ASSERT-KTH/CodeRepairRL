@@ -24,7 +24,7 @@ export CRRL_WORKDIR="/proj/<project>/users/<user>"
 ```bash
 sbatch benchmarks/swe_bench_nano_infer_job.sh \
   --base-model Qwen/Qwen3-8B
-# With LoRA (adapter name "nano"); include adapter path for tagging
+# With LoRA (adapter name auto-derived from lora path basename)
 sbatch benchmarks/swe_bench_nano_infer_job.sh \
   --base-model Qwen/Qwen3-8B \
   --lora-path /path/to/nano_lora
@@ -37,12 +37,13 @@ benchmarks/swe_bench/results/<scaffold>-<model_tag>/shard_<array_id>/preds.jsonl
 ```
 
 Examples:
-- Base model (no LoRA): `benchmarks/swe_bench/results/nano-agent-hosted_vllm__Qwen__Qwen3-8B/shard_0/preds.jsonl`
+- Base model (no LoRA): `benchmarks/swe_bench/results/nano-agent-Qwen__Qwen3-8B/shard_0/preds.jsonl`
 - With LoRA (adapter basename "nano_lora"):
   `benchmarks/swe_bench/results/nano-agent-Qwen__Qwen3-8B__lora__nano_lora/shard_0/preds.jsonl`
 
 Notes:
-- `<model_tag>` is sanitized to be filesystem-safe. For base-only runs it derives from `hosted_vllm/<BASE_MODEL>`; for LoRA runs it derives from `<BASE_MODEL>__lora__<adapter_basename>`.
+- `<model_tag>` is sanitized to be filesystem-safe. For base-only runs it derives from `<BASE_MODEL>`; for LoRA runs it derives from `<BASE_MODEL>__lora__<adapter_basename>`.
+- The agent model name is set automatically: if a LoRA is provided, it uses the LoRA adapter name (basename of the LoRA path); otherwise it uses the base model name.
 - The job supports SLURM arrays. Each task writes to its own `shard_<array_id>` and auto-selects a dataset slice (default shard size 50).
 
 ### Eval (on the CPU server)

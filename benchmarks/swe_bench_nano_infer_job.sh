@@ -15,7 +15,7 @@ source scripts/appt_common.sh
 
 # Defaults
 BASE_MODEL="Qwen/Qwen3-8B"     # HF model to serve with vLLM
-LORA_PATH=""                    # Optional LoRA path; enables adapter name "nano" if set
+LORA_PATH=""                    # Optional LoRA path; adapter name auto-derived from basename if set
 MODEL_NAME=""                   # Model name passed to the agent; auto-derived if empty
 SCAFFOLD="nano-agent"           # Scaffold identifier for run tagging
 OUTPUT_BASE_DIR="swe_bench/results"
@@ -71,12 +71,22 @@ fi
 
 ENDPOINT="http://localhost:${PORT}/v1"
 
-# Derive MODEL_NAME if not explicitly provided
-if [[ -z "$MODEL_NAME" ]]; then
-  if [[ -n "$LORA_PATH" ]]; then
-    MODEL_NAME="nano"  # Use LoRA adapter by name
+# Derive MODEL_NAME and LoRA adapter name if not explicitly provided
+LORA_ADAPTER_NAME=""
+if [[ -n "$LORA_PATH" ]]; then
+  if [[ -z "$MODEL_NAME" ]]; then
+    # Derive adapter name from LoRA path basename and sanitize for use as model id
+    ADAPTER_BASENAME="$(basename "$LORA_PATH")"
+    LORA_ADAPTER_NAME=$(printf '%s' "$ADAPTER_BASENAME" | sed -E 's/[^A-Za-z0-9._-]+/_/g; s/_+/_/g; s/^_+|_+$//g')
+    MODEL_NAME="$LORA_ADAPTER_NAME"
   else
-    MODEL_NAME="hosted_vllm/${BASE_MODEL}"
+    # Honor explicit model name; use it as the LoRA adapter name
+    LORA_ADAPTER_NAME="$MODEL_NAME"
+  fi
+else
+  # No LoRA: default model name is the base model being served
+  if [[ -z "$MODEL_NAME" ]]; then
+    MODEL_NAME="$BASE_MODEL"
   fi
 fi
 
@@ -122,7 +132,7 @@ if [[ $START_SERVER -eq 1 ]]; then
     --reasoning-parser qwen3)
 
   if [[ -n "$LORA_PATH" ]]; then
-    CMD+=(--enable-lora --lora-modules "nano=$LORA_PATH")
+    CMD+=(--enable-lora --lora-modules "$LORA_ADAPTER_NAME=$LORA_PATH")
   fi
 
   # Start server in background and capture PID
