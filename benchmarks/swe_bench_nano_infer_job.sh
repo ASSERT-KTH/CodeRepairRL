@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --gpus 1
 #SBATCH --time=00:30:00
-#SBATCH -C "thin"
+#SBATCH -C "fat"
 #SBATCH --array=0-9
 
 set -euo pipefail
