@@ -27,7 +27,9 @@ APPT_COMMON=(
   --env "VLLM_ALLOW_INSECURE_SERIALIZATION=1"
   --env "TORCH_NCCL_ASYNC_ERROR_HANDLING=1"
   --env "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True"
+  --env "HF_TOKEN=${HF_TOKEN}"
 )
+
 
 # Export as a flat string for convenient interpolation in scripts
 export APPT_COMMON="${APPT_COMMON[*]}"
