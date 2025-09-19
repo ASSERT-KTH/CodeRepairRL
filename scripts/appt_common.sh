@@ -38,6 +38,7 @@ APPT_COMMON=(
   --env "PYTHONNOUSERSITE=1"
   --env "VLLM_ALLOW_INSECURE_SERIALIZATION=1"
   --env "TORCH_NCCL_ASYNC_ERROR_HANDLING=1"
+<<<<<<< HEAD
 
   # Keep these job-scoped (you already did this right)
   --env "TORCHINDUCTOR_CACHE_DIR=${CRRL_WORKDIR}/.cache/torchinductor_${SLURM_JOB_ID}"
@@ -50,7 +51,10 @@ APPT_COMMON=(
   --env "TOKENIZERS_PARALLELISM=false"
   # Debug toggles (enable only when diagnosing):
   # --env "CUDA_LAUNCH_BLOCKING=1"
+  --env "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True"
+  --env "HF_TOKEN=${HF_TOKEN}"
 )
+
 
 # Export as a flat string for convenient interpolation in scripts
 export APPT_COMMON="${APPT_COMMON[*]}"
