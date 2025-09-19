@@ -132,7 +132,7 @@ if [[ $START_SERVER -eq 1 ]]; then
     --reasoning-parser qwen3)
 
   if [[ -n "$LORA_PATH" ]]; then
-    CMD+=(--enable-lora --lora-modules "$LORA_ADAPTER_NAME=$LORA_PATH")
+    CMD+=(--max-lora-rank 32 --enable-lora --lora-modules "$LORA_ADAPTER_NAME=$LORA_PATH")
   fi
 
   # Start server in background and capture PID
