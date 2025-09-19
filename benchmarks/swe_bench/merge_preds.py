@@ -2,24 +2,35 @@
 """
 Merge preds.jsonl files from multiple shards into a single file.
 
-Defaults assume the job array wrote shard outputs to:
-  benchmarks/swe_bench/results_nano/shard_<TASK_ID>/preds.jsonl
+Expected layout (per run):
+  benchmarks/swe_bench/results/<run_tag>/shard_<TASK_ID>/preds.jsonl
+
+Where <run_tag> encodes scaffold and model, e.g.:
+  nano-agent-hosted_vllm__Qwen__Qwen3-8B
+  nano-agent-Qwen__Qwen3-8B__lora__nano_lora
 
 Usage examples:
-  - Merge all shard_* under results_nano to preds.jsonl in the same root:
+  - Merge all shard_* for a specific run_tag and write to run root:
       python3 benchmarks/swe_bench/merge_preds.py \
-        --input-root benchmarks/swe_bench/results_nano \
-        --output benchmarks/swe_bench/results_nano/preds.jsonl
+        --input-root benchmarks/swe_bench/results \
+        --run-tag nano-agent-hosted_vllm__Qwen__Qwen3-8B \
+        --output benchmarks/swe_bench/results/nano-agent-hosted_vllm__Qwen__Qwen3-8B/preds.jsonl
+
+  - Merge when input-root is already the run directory:
+      python3 benchmarks/swe_bench/merge_preds.py \
+        --input-root benchmarks/swe_bench/results/nano-agent-hosted_vllm__Qwen__Qwen3-8B \
+        --output benchmarks/swe_bench/results/nano-agent-hosted_vllm__Qwen__Qwen3-8B/preds.jsonl
 
   - Merge explicit files:
       python3 benchmarks/swe_bench/merge_preds.py \
-        --inputs shard_0/preds.jsonl shard_1/preds.jsonl \
-        --output benchmarks/swe_bench/results_nano/preds.jsonl
+        --inputs path/to/shard_0/preds.jsonl path/to/shard_1/preds.jsonl \
+        --output path/to/preds.jsonl
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import sys
 from pathlib import Path
@@ -30,8 +41,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Merge shard preds.jsonl files into one.")
     parser.add_argument(
         "--input-root",
-        default="benchmarks/swe_bench/results_nano",
-        help="Root directory containing shard_* subdirectories",
+        default="benchmarks/swe_bench/results",
+        help="Either the run directory (<results>/<run_tag>) or its parent results directory",
+    )
+    parser.add_argument(
+        "--run-tag",
+        default="",
+        help="Optional run tag (scaffold-model tag). If provided, shards are searched under <input-root>/<run-tag>",
     )
     parser.add_argument(
         "--pattern",
@@ -46,8 +62,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output",
-        default="benchmarks/swe_bench/results_nano/preds.jsonl",
-        help="Path to write merged preds.jsonl",
+        default="",
+        help="Path to write merged preds.jsonl. Defaults to <run_root>/preds.jsonl when discoverable",
     )
     parser.add_argument(
         "--dedup",
@@ -146,7 +162,15 @@ def main() -> None:
         input_files = [Path(p) for p in args.inputs]
     else:
         input_root = Path(args.input_root)
-        input_files = discover_input_files(input_root, args.pattern)
+        run_root: Path
+        # If a run-tag is provided, search under input_root/run_tag
+        if args.run_tag:
+            run_root = input_root / args.run_tag
+        else:
+            # If input_root already looks like a run directory (contains shard_*), use it directly.
+            has_shards = any(p.is_dir() and p.name.startswith("shard_") for p in input_root.iterdir()) if input_root.exists() else False
+            run_root = input_root if has_shards else input_root
+        input_files = discover_input_files(run_root, args.pattern)
 
     if not input_files:
         print("[error] No input files found", file=sys.stderr)
@@ -159,7 +183,15 @@ def main() -> None:
     merged = merge_preds(input_files, args.dedup)
     print(f"Total merged instances: {len(merged)}")
 
-    output_path = Path(args.output)
+    # Derive default output path if not provided and run_root is known
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        # If args.run_tag was provided, write into that directory; else if input_root looks like run dir, write there.
+        if args.run_tag:
+            output_path = Path(args.input_root) / args.run_tag / "preds.jsonl"
+        else:
+            output_path = Path(args.input_root) / "preds.jsonl"
     write_jsonl(merged, output_path)
     print(f"Wrote: {output_path}")
 
