@@ -153,7 +153,7 @@ apptainer exec $APPT_COMMON \
   --env OPENAI_API_KEY="dummy" \
   "$SIF" python3 benchmarks/swe_bench/run_nano_eval.py \
     --endpoint "$ENDPOINT" \
-    --model-name "$MODEL_NAME" \
+    --model-name "hosted_vllm/$MODEL_NAME" \
     --output-dir "$OUTPUT_DIR" \
     --subset "$SUBSET" \
     --split "$SPLIT" \
