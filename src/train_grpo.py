@@ -246,7 +246,7 @@ def main(cfg: Config) -> None:
             dataset_a = get_swe_gym_repo_repair_dataset(dataset_name="SWE-Gym/SWE-Gym").select(range(750))  # pick 750
             dataset_b = get_swe_gym_repo_repair_dataset(dataset_name="SWE-bench/SWE-bench_Multilingual").select(range(250))  # use 250, leave 50 for evals
             dataset = concatenate_datasets([dataset_a, dataset_b])
-            dataset = dataset.shuffle()
+            dataset = dataset.shuffle(seed=42)
         else:
             dataset = get_swe_gym_repo_repair_dataset(dataset_name=cfg.run.dataset_name)
         
