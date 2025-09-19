@@ -65,6 +65,8 @@ python -m swebench.harness.run_evaluation \
   --split "$split" \
   --predictions_path "$preds" \
   --max_workers "$max_workers" \
-  --run_id "$run_id"
+  --run_id "$run_id" \
+  --cache_level "instance" \
+  --timeout 3600
 
 
