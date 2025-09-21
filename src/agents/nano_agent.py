@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class NanoConfig:
+    agent_kind: str = "nano"
     model: Optional[str] = None
     api_base: str = "http://localhost:8000/v1"
     thinking: bool = False
@@ -34,7 +35,9 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
     logger.info(f"[START] {data['repo']} @ {data['base_commit'][:7]}")
     start_time = time.time()
 
-    agent = Agent(**asdict(config))
+    agent_kwargs = asdict(config)
+    agent_kwargs.pop("agent_kind", None)
+    agent = Agent(**agent_kwargs)
 
     diff = ""
     temp_folder = None

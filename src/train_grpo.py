@@ -14,7 +14,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from huggingface_hub import whoami
 from datasets import concatenate_datasets
 
-from src.agents.nano_agent import nano_rollout_func, NanoConfig
+from src.agents.nano_agent import nano_rollout_func, NanoConfig as AgentConfig
+from src.agents.mini_agent import mini_rollout_func
 from src.rewards import (
     # reasoning rewards
     partial_reasoning_format_reward_func,
@@ -150,7 +151,7 @@ class Config:
     run: RunConfig = field(default_factory=RunConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     grpo: GRPOConfig = field(default_factory=GRPOConfig)
-    agent: NanoConfig = field(default_factory=NanoConfig)
+    agent: AgentConfig = field(default_factory=AgentConfig)
 
 # Register the config schema
 cs = ConfigStore.instance()
@@ -240,8 +241,13 @@ def main(cfg: Config) -> None:
         cfg.agent.model = f"hosted_vllm/{cfg.model.model_name}"
         cfg.agent.token_limit = cfg.grpo.max_prompt_length + cfg.grpo.max_completion_length
         # Convert OmegaConf to NanoConfig dataclass
-        agent_config = NanoConfig(**OmegaConf.to_container(cfg.agent, resolve=True))
-        rollout_func = partial(nano_rollout_func, config=agent_config)
+        agent_config = AgentConfig(**OmegaConf.to_container(cfg.agent, resolve=True))
+        if agent_config.agent_kind == "nano":
+            rollout_func = partial(nano_rollout_func, config=agent_config)
+        elif agent_config.agent_kind == "mini":
+            rollout_func = partial(mini_rollout_func, config=agent_config)
+        else:
+            raise ValueError(f"Unsupported repo repair agent '{agent_config.agent_kind}'")
         # Use a single primary reward (diff similarity) plus a tiny continuous terminal shaping term
         reward_functions = [
             unified_diff_similarity_reward_func,    # primary objective
