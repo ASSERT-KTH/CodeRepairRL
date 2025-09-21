@@ -22,20 +22,15 @@ if [[ "${1:-}" == --model_config ]]; then MODEL_CONFIG="${2:?}"; shift 2; fi
 MASTER_PORT=43001
 MODEL_NAME=$(awk -F '"' '/^model_name:/ {print $2; exit}' "src/conf/model/${MODEL_CONFIG}.yaml")
 
-RP=""; TP=""; CT=""; PLUG=""
+RP=""; TP=""; CT=""
 case "${MODEL_CONFIG,,}" in
   *qwen*)     RP="--reasoning_parser qwen3"; TP="--tool_call_parser hermes";;
   # xlam isn't the actual parser we use, is a workaround for a vLLM bug that validates tool-call-parser before injecting our one, so we override
-  *nemotron*) TP="--tool_call_parser llama3_nemotron_json"; CT="--chat-template src/chat_templates/llama_nemotron_nano_generic_tool_calling.jinja"; PLUG="--tool_parser_plugin src/chat_templates/llama_nemotron_nano_toolcall_parser.py";;
+  *nemotron*) TP="--tool_call_parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
   *llama*)    TP="--tool_call_parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
-  *mistral*)  TP="--tool_call_parser mistral"; CT="--chat-template src/chat_templates/tool_chat_template_mistral.jinja";;
+  *mistral*)  TP="--tool_call_parser hermes";;
   *)          TP="--tool_call_parser hermes";;
 esac
-
-echo "CT: $CT"
-echo "PLUG: $PLUG"
-echo "RP: $RP"
-echo "TP: $TP"
 
 
 # Context window configuration
@@ -49,11 +44,10 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 crrl.sif \
     trl vllm-serve-async \
     --model "$MODEL_NAME" \
     --max-model-len $VLLM_CONTEXT_LENGTH \
-    --disable_log_stats \
+    --disable-log-stats \
     --gpu-memory-utilization 0.94 \
-    --enable_auto_tool_choice \
+    --enable-auto-tool-choice \
     $CT \
-    $PLUG \
     $RP $TP \
     &
 

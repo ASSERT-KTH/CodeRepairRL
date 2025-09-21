@@ -2,4 +2,4 @@ defaults:
   - small_qwen
 
 model_name: "mistralai/Ministral-8B-Instruct-2410"
-chat_template: "src/chat_templates/tool_chat_template_mistral.jinja"
+# chat_template: "src/chat_templates/tool_chat_template_mistral.jinja"
