@@ -21,7 +21,7 @@ MODEL_NAME=$(awk -F '"' '/^model_name:/ {print $2; exit}' "src/conf/model/${MODE
 
 # Context window configuration, this defines our compute requirements more than anything else
 MAX_PROMPT_LENGTH=1024
-MAX_COMPLETION_LENGTH=12288
+MAX_COMPLETION_LENGTH=8192
 MAX_CONTEXT_LENGTH=$((MAX_PROMPT_LENGTH + MAX_COMPLETION_LENGTH))
 VLLM_CONTEXT_LENGTH=$((MAX_CONTEXT_LENGTH + 1024))  # not strictly needed, but so we don't get context window errors
 
@@ -55,7 +55,7 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=2,3,4,5 crrl.sif accelera
         grpo.max_prompt_length=$MAX_PROMPT_LENGTH \
         grpo.max_completion_length=$MAX_COMPLETION_LENGTH \
         grpo.num_generations=4 \
-        grpo.steps_per_generation=2 \
+        grpo.generation_batch_size=8 \
         grpo.per_device_train_batch_size=1 \
         grpo.gradient_accumulation_steps=4 \
         grpo.optim="adamw_torch" \
