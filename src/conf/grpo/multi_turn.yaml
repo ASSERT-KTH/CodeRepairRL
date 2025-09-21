@@ -3,7 +3,7 @@ defaults:
 
 vllm_mode: "async_server"
 multi_turn: true
-mask_tool_responses: true
+mask_tool_responses: false
 
 max_prompt_length: 1024  # not strictly enforced
 max_completion_length: 7168  # but dr_grpo uses this for normalization

@@ -23,11 +23,10 @@ MASTER_PORT=43001
 MODEL_NAME=$(awk -F '"' '/^model_name:/ {print $2; exit}' "src/conf/model/${MODEL_CONFIG}.yaml")
 
 # Minimal parser selection based on model name and optional chat template/plugin
-RP=""; TP=""; CT=""; PLUG=""
+RP=""; TP=""; CT=""
 case "${MODEL_CONFIG,,}" in
   *qwen*)     RP="--reasoning_parser qwen3"; TP="--tool_call_parser hermes";;
-  # xlam isn't the actual parser we use, is a workaround for a vLLM bug that validates tool-call-parser before injecting our one, so we override
-  *nemotron*) TP="--tool_call_parser llama3_nemotron_json"; CT="--chat-template src/chat_templates/llama_nemotron_nano_generic_tool_calling.jinja"; PLUG="--tool_parser_plugin src/chat_templates/llama_nemotron_nano_toolcall_parser.py";;
+  *nemotron*) TP="--tool_call_parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
   *llama*)    TP="--tool_call_parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
   *mistral*)  TP="--tool_call_parser mistral"; CT="--chat-template src/chat_templates/tool_chat_template_mistral.jinja";;
   *)          TP="--tool_call_parser hermes";;
@@ -35,7 +34,7 @@ esac
 
 # Context window configuration
 MAX_PROMPT_LENGTH=1024
-MAX_COMPLETION_LENGTH=12288
+MAX_COMPLETION_LENGTH=9216
 MAX_CONTEXT_LENGTH=$((MAX_PROMPT_LENGTH + MAX_COMPLETION_LENGTH))
 VLLM_CONTEXT_LENGTH=$((MAX_CONTEXT_LENGTH + 1024))  # not strictly needed, but so we don't get context window errors
 
@@ -48,7 +47,6 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 crrl.sif \
     --gpu-memory-utilization 0.94 \
     --enable_auto_tool_choice \
     $CT \
-    $PLUG \
     $RP $TP \
     &
 
@@ -56,9 +54,11 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 crrl.sif \
 apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=1 crrl.sif accelerate launch \
     --main_process_port $MASTER_PORT \
     --num_processes 1 \
+    --num_machines 1 \
+    --mixed_precision bf16 \
+    --dynamo_backend no \
     --module src.train_grpo -- \
-        run=repo_repair \
-        run.dataset_name="SWE-Gym/SWE-Gym-Lite" \
+        run=repo_repair_multilingual \
         model=$MODEL_CONFIG \
         agent.time_limit=60 \
         grpo=multi_turn_gspo \
@@ -67,6 +67,6 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=1 crrl.sif accelerate lau
         grpo.num_generations=4 \
         grpo.generation_batch_size=8 \
         grpo.per_device_train_batch_size=4 \
-        grpo.gradient_accumulation_steps=3 \
+        grpo.gradient_accumulation_steps=4 \
         grpo.optim="paged_adamw_8bit" \
         "$@"  # pass any additional arguments
