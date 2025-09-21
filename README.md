@@ -2,13 +2,8 @@
 
 ## Overview
 
-CodeRepairRL leverages recent advancements in applying Reinforcement Learning (RL) to Large Language Models (LLMs) to fine-tune them for domain-specific tasks. Our ultimate goal is to develop models similar to [RepairLLama](https://arxiv.org/pdf/2312.15698) and [Llama-3-SWE-RL](https://arxiv.org/pdf/2502.18449), which "punch above their weight-class" in terms of parameter count, demonstrating exceptional performance in software engineering benchmarks.
+CodeRepairRL leverages recent advancements in applying Reinforcement Learning (RL) to Large Language Models (LLMs) to fine-tune them for domain-specific tasks. Our ultimate goal is to develop open source method of training agentic coding behaviour unto models.
 
-The project uses a two-stage training approach:
-1. **Supervised Fine-Tuning (SFT)**: Initial fine-tuning on high-quality code repair demonstrations
-2. **Group Relative Policy Optimization (GRPO)**: Reinforcement learning to further improve performance on specific tasks
-
-For more details on the project's objectives, conceptual background, and implementation specifics, see [docs/PROJECT.md](docs/PROJECT.md).
 
 ## Academic Paper
 
@@ -36,6 +31,7 @@ Before launching jobs, you should set `CRRL_WORKDIR` in your environment. Otherw
 ```bash
 # Choose your working directory (pick a location with plenty of fast storage)
 export CRRL_WORKDIR="/path/to/your/crrl_workspace"
+export WANDB_API_KEY="your-key"
 ```
 
 Then follow the container build and SLURM job submission steps above. This ensures that large model files and datasets are stored in a location with sufficient space rather than your home directory.

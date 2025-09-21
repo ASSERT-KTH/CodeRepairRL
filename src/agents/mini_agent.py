@@ -95,7 +95,7 @@ def _process_one(data: dict[str, Any], config: AgentConfig) -> dict[str, Any]:
             clean_repo_dir(str(repo_dir))
 
 
-def mini_rollout_func(data: list[dict[str, Any]], config: MiniConfig, **kwargs) -> list[dict[str, Any]]:
+def mini_rollout_func(data: list[dict[str, Any]], config: AgentConfig, **kwargs) -> list[dict[str, Any]]:
     """Deploys parallel Mini-SWE-Agent rollouts against vLLM."""
     logger.info(f"Starting {len(data)} agent rollouts")
     t0 = time.time()
