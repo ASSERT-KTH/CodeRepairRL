@@ -1,0 +1,5 @@
+defaults:
+  - small_qwen
+
+model_name: "zai-org/GLM-4-9B-0414"
+

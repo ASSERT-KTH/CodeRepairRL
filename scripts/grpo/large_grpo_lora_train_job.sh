@@ -13,10 +13,11 @@
 # Apptainer common runtime configuration (requires CRRL_WORKDIR)
 source scripts/appt_common.sh
 
+# MODEL_CONFIG can be provided via env or as --model_config <name>
+MODEL_CONFIG="large_qwen"
 
 MASTER_PORT=43001
-MODEL_CONFIG="large_qwen"
-MODEL_NAME=$(grep -Po '^model_name: "\K[^"]*' src/conf/model/${MODEL_CONFIG}.yaml)
+MODEL_NAME=$(awk -F '"' '/^model_name:/ {print $2; exit}' "src/conf/model/${MODEL_CONFIG}.yaml")
 
 # Context window configuration, this defines our compute requirements more than anything else
 MAX_PROMPT_LENGTH=1024
@@ -36,6 +37,8 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0,1 crrl.sif \
     --reasoning_parser qwen3 \
     --tool_call_parser hermes \
     --tensor_parallel_size 2 \
+    --disable_custom_all_reduce \
+    --enforce_eager \
     &  # & makes it run in the background
 
 sleep 200  # give the vLLM server a bit more time to start
@@ -47,7 +50,6 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=2,3,4,5 crrl.sif accelera
     --module src.train_grpo -- \
         run=repo_repair_multilingual \
         model=$MODEL_CONFIG \
-        model.model_name=$MODEL_NAME \
         agent.time_limit=80 \
         grpo=multi_turn_gspo \
         grpo.max_prompt_length=$MAX_PROMPT_LENGTH \

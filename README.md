@@ -151,6 +151,22 @@ sbatch scripts/grpo/medium_grpo_lora_train_job.sh run=detection
 sbatch scripts/grpo/medium_grpo_train_job.sh model=medium_llama
 ```
 
+### Model selection via MODEL_CONFIG (env)
+
+You can select a model configuration by setting the `MODEL_CONFIG` environment variable before submitting the job. The value should match a file in `src/conf/model/` (without the `.yaml` suffix).
+
+Example:
+
+```bash
+MODEL_CONFIG=small_qwen \
+sbatch scripts/grpo/medium_grpo_lora_train_job.sh \
+  grpo.run_name="Qwen3-8B-Multingual"
+```
+
+Notes:
+- Small and medium scripts respect `MODEL_CONFIG`. Large scripts are fixed to Qwen3 models.
+- vLLM parser/templating is auto-selected in scripts based on the base model name (Qwen → qwen3/hermes; Llama → llama3_json + llama3.1 tool chat template etc.)
+
 ## Local Development
 
 For "local" development and testing without Apptainer containers, you can use `uv` directly.

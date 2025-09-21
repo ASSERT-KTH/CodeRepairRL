@@ -27,15 +27,19 @@ from src.rewards import (
     sr_diff_similarity_reward_func,
     # repo repair rewards
     unified_diff_similarity_reward_func,
-    terminal_debugging_habits_reward_func,
 )
 from src.data import get_stack_repair_dataset, get_primevul_repair_dataset, get_primevul_detection_dataset, get_swe_gym_repo_repair_dataset
 from src.utils.git import resolve_git_commit_hash
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # This ensures output goes to stdout/stderr
+    ]
+)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-logger.propagate = False
 
 for noisy in ("httpx", "LiteLLM"):
     logging.getLogger(noisy).setLevel(logging.CRITICAL)
@@ -60,15 +64,13 @@ class RunConfig:
 class ModelConfig:
     # Transformers configuration
     model_name: str = "Qwen/Qwen3-8B"
-    attn_implementation: str = "flash_attention_3"  # only on >Hopper GPUs
+    attn_implementation: str = "flash_attention_2"
+    chat_template: Optional[str] = None  # optional path to jinja chat template
     # LoRA configuration
     lora: bool = True
     r: int = 32
     lora_alpha: int = 64
     target_modules: tuple[str] = ("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj")
-    layers_pattern: str = "blocks.{}"
-    layers_to_transform: tuple[int] = (22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32)
-    
 
 @dataclass
 class GRPOConfig:
@@ -99,7 +101,7 @@ class GRPOConfig:
 
     # Generation and Training settings
     num_generations: int = 4
-    steps_per_generation: int = 1
+    generation_batch_size: int = 4
     num_iterations: int = 1  # inner loop \mu in the algorithm, turned off unless >1
     per_device_train_batch_size: int = 4
     gradient_accumulation_steps: int = 1
@@ -168,6 +170,16 @@ def main(cfg: Config) -> None:
             "Please provide a unique run name to prevent model overwriting. "
             "Example: grpo.run_name='my-grpo-experiment-v1'"
         )
+        
+    # Print all configs for debugging/verification
+    logger.info("=" * 50)
+    logger.info("CONFIGURATION SUMMARY")
+    logger.info("=" * 50)
+    logger.info(f"Run Config:\n{OmegaConf.to_yaml(cfg.run)}")
+    logger.info(f"Model Config:\n{OmegaConf.to_yaml(cfg.model)}")
+    logger.info(f"GRPO Config:\n{OmegaConf.to_yaml(cfg.grpo)}")
+    logger.info(f"Agent Config:\n{OmegaConf.to_yaml(cfg.agent)}")
+    logger.info("=" * 50)
     
     os.environ["WANDB_PROJECT"] = cfg.run.wandb_project
 
@@ -181,11 +193,13 @@ def main(cfg: Config) -> None:
     # Log precision settings
     precision_mode = torch.bfloat16 if cfg.grpo.bf16 else torch.float16 if cfg.grpo.fp16 else torch.float32
     logger.info(f"Training with {precision_mode} precision based on GPU architecture")
-    
+
     # Load base model
     logger.info(f"Loading model: {cfg.model.model_name}")
     model = AutoModelForCausalLM.from_pretrained(cfg.model.model_name, attn_implementation=cfg.model.attn_implementation, torch_dtype=precision_mode)
     tokenizer = AutoTokenizer.from_pretrained(cfg.model.model_name)
+    if cfg.model.chat_template: tokenizer.chat_template = open(cfg.model.chat_template).read()
+        
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"  # by padding a batch of prompts on the left side we can generate many completions in parallel (padding tokens are masked away)
 
@@ -233,7 +247,7 @@ def main(cfg: Config) -> None:
             dataset_a = get_swe_gym_repo_repair_dataset(dataset_name="SWE-Gym/SWE-Gym").select(range(750))  # pick 750
             dataset_b = get_swe_gym_repo_repair_dataset(dataset_name="SWE-bench/SWE-bench_Multilingual").select(range(250))  # use 250, leave 50 for evals
             dataset = concatenate_datasets([dataset_a, dataset_b])
-            dataset = dataset.shuffle()
+            dataset = dataset.shuffle(seed=42)
         else:
             dataset = get_swe_gym_repo_repair_dataset(dataset_name=cfg.run.dataset_name)
         
