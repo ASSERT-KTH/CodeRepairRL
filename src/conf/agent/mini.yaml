@@ -1,0 +1,4 @@
+defaults:
+  - nano
+
+agent_kind: mini

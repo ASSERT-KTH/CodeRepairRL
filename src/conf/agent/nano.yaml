@@ -1,3 +1,4 @@
+agent_kind: nano
 model: null  # Assigned from ModelConfig in train script
 api_base: "http://localhost:8000/v1"
 thinking: false
