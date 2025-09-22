@@ -67,6 +67,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
         })
 
     predictions: dict[str, dict] = {}
+    detailed_predictions: dict[str, dict] = {}
 
     # Run with a process pool of up to 8 workers
     max_workers = min(8, len(inputs)) if inputs else 0
@@ -102,6 +103,10 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
                 "model_name_or_path": f"nano-agent-{config.model}",
             }
 
+            # Store the entire result dictionary for detailed analysis
+            if result:
+                detailed_predictions[instance_id] = result
+
             completed += 1
             if completed % 5 == 0 or completed == len(inputs):
                 print(f"Progress: {completed}/{len(inputs)} completed")
@@ -119,6 +124,14 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
             f.write(json.dumps(obj, ensure_ascii=False) + "\n")
     
     print(f"Saved JSONL format to {jsonl_file}")
+
+    # Save detailed predictions (entire result dictionaries)
+    detailed_file = output_dir / "detailed_predictions.jsonl"
+    with open(detailed_file, "w") as f:
+        for instance_id, det in detailed_predictions.items():
+            obj = {"instance_id": instance_id, "detailed_predictions": det}
+            f.write(json.dumps(obj, ensure_ascii=False, default=str) + "\n")
+    print(f"Saved detailed predictions to {detailed_file}")
     
     # Quick validation - check if patches can apply
     valid_count = 0
