@@ -36,7 +36,7 @@ esac
 MAX_PROMPT_LENGTH=1024
 MAX_COMPLETION_LENGTH=9216
 MAX_CONTEXT_LENGTH=$((MAX_PROMPT_LENGTH + MAX_COMPLETION_LENGTH))
-VLLM_CONTEXT_LENGTH=$((MAX_CONTEXT_LENGTH + 1024))  # not strictly needed, but so we don't get context window errors
+VLLM_CONTEXT_LENGTH=$((MAX_CONTEXT_LENGTH + 4096))  # not strictly needed, but so we don't get context window errors
 
 
 apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 crrl.sif \

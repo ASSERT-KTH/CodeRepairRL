@@ -7,6 +7,7 @@ from typing import Optional
 import wandb
 import hydra
 import torch
+from litellm import register_model
 from omegaconf import OmegaConf
 from hydra.core.config_store import ConfigStore
 from peft import LoraConfig as PEFTLoraConfig
@@ -262,6 +263,15 @@ def main(cfg: Config) -> None:
         if agent_config.agent_kind == "nano":
             rollout_func = partial(nano_rollout_func, config=agent_config)
         elif agent_config.agent_kind == "mini":
+            register_model({
+                f"{cfg.model.model_name}": {
+                    "mode": "chat",
+                    "litellm_provider": "openai",
+                    "max_tokens": cfg.grpo.max_prompt_length + cfg.grpo.max_completion_length + 2048,          # set to your served context
+                    "input_cost_per_token": 0.0,  # pick any numbers for local
+                    "output_cost_per_token": 0.0
+                }
+            })
             rollout_func = partial(mini_rollout_func, config=agent_config)
         else:
             raise ValueError(f"Unsupported repo repair agent '{agent_config.agent_kind}'")

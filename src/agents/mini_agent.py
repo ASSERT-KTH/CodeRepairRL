@@ -56,6 +56,8 @@ def _process_one(data: dict[str, Any], config: AgentConfig) -> dict[str, Any]:
             "api_key": "DUMMY",
             "temperature": config.temperature,
             "drop_params": True,          # ignore extras vLLM may not support
+            "max_tokens": 2048,
+            "max_output_tokens": 2048,
         }
         if config.top_p is not None:
             model_kwargs["top_p"] = config.top_p
@@ -63,7 +65,7 @@ def _process_one(data: dict[str, Any], config: AgentConfig) -> dict[str, Any]:
             model_kwargs["top_k"] = config.top_k
 
         # use mini's defaults
-        model = LitellmModel(model_name=config.model.replace("hosted_vllm/", ""), model_kwargs=model_kwargs)
+        model = LitellmModel(model_name=config.model, model_kwargs=model_kwargs)
         env = LocalEnvironment(cwd=str(repo_dir), timeout=config.time_limit)
         agent = DefaultAgent(model=model, env=env, cost_limit=0)
         status, final_msg = agent.run(task=data["problem_statement"])
@@ -98,6 +100,8 @@ def mini_rollout_func(data: list[dict[str, Any]], config: AgentConfig, **kwargs)
     """Deploys parallel Mini-SWE-Agent rollouts against vLLM."""
     logger.info(f"Starting {len(data)} agent rollouts")
     t0 = time.time()
+    
+    config.model = config.model.replace("hosted_vllm/", "")
 
     with ThreadPoolExecutor(max_workers=min(len(data), os.cpu_count() or 1)) as ex:
         results = list(ex.map(lambda d: _process_one(d, config), data))
