@@ -162,7 +162,9 @@ OmegaConf.register_new_resolver("resolve_git_commit_hash", resolve_git_commit_ha
 
 
 @hydra.main(version_base="1.1", config_path="conf", config_name="grpo_config")
-def main(cfg: Config) -> None:    
+def main(cfg: Config) -> None:
+    wandb.login(key=os.environ["WANDB_API_KEY"])
+    
     # Validate that run_name is provided and not empty
     if not cfg.grpo.run_name or cfg.grpo.run_name.strip() == "":
         raise ValueError(
