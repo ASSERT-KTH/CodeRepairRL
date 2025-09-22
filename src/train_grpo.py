@@ -4,6 +4,7 @@ from functools import partial
 from dataclasses import dataclass, field
 from typing import Optional
 
+import wandb
 import hydra
 import torch
 from omegaconf import OmegaConf

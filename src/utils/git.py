@@ -33,7 +33,7 @@ def clone_repo_at_commit(repo_url: str, commit_id: str, target_dir: Optional[str
 
 def clean_repo_dir(repo_path: str):
     """Clean tempfolder"""
-    assert repo_path.startswith("/tmp/") or repo_path.startswith("/var/folders/") or repo_path.startswith("/local/tmp"), "For safety, repo_path must be a temporary directory"
+    assert repo_path.startswith("/tmp/") or repo_path.startswith("/var/folders/") or repo_path.startswith("/local/tmp") or repo_path.count(".tmp/") > 0, "For safety, repo_path must be a temporary directory"
     try:
         shutil.rmtree(repo_path)
     except FileNotFoundError:

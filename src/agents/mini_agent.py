@@ -55,7 +55,6 @@ def _process_one(data: dict[str, Any], config: AgentConfig) -> dict[str, Any]:
             "api_base": config.api_base,
             "api_key": "DUMMY",
             "temperature": config.temperature,
-            "max_tokens": config.token_limit,
             "drop_params": True,          # ignore extras vLLM may not support
         }
         if config.top_p is not None:
@@ -64,9 +63,9 @@ def _process_one(data: dict[str, Any], config: AgentConfig) -> dict[str, Any]:
             model_kwargs["top_k"] = config.top_k
 
         # use mini's defaults
-        model = LitellmModel(model_name=config.model, model_kwargs=model_kwargs)
+        model = LitellmModel(model_name=config.model.replace("hosted_vllm/", ""), model_kwargs=model_kwargs)
         env = LocalEnvironment(cwd=str(repo_dir), timeout=config.time_limit)
-        agent = DefaultAgent(model=model, env=env)
+        agent = DefaultAgent(model=model, env=env, cost_limit=0)
         status, final_msg = agent.run(task=data["problem_statement"])
 
         generated = git_diff(repo_dir)
@@ -114,7 +113,7 @@ if __name__ == "__main__":
     runs = 1
     data = get_swe_gym_repo_repair_dataset().shuffle(seed=42)
 
-    config = MiniConfig(model="hosted_vllm/Qwen/Qwen3-8B")
+    config = AgentConfig(model="hosted_vllm/Qwen/Qwen3-8B")
 
     for size in batch_sizes:
         print(f"Testing batch size {size}")
