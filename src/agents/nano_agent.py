@@ -55,6 +55,8 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
             completion=agent.messages[2:],
             tools=agent.tools,
             generated_diff="",
+            token_usage=agent.token_usage,
+            tool_usage=agent.tool_usage,
             **agent.tool_stats
         )
         
@@ -76,6 +78,8 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
         completion=agent.messages[2:],
         tools=agent.tools,
         generated_diff=diff,
+        token_usage=agent.token_usage,
+        tool_usage=agent.tool_usage,
         **agent.tool_stats
     )
     return result
