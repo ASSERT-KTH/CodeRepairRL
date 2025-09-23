@@ -122,14 +122,24 @@ wait_for_vllm() {
   return 1
 }
 
+# Minimal parser selection based on base model and optional chat template
+RP=""; TP=""; CT=""
+case "${BASE_MODEL,,}" in
+  *qwen*)     RP="--reasoning-parser qwen3"; TP="--tool-call-parser hermes";;
+  *nemotron*) TP="--tool-call-parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
+  *llama*)    TP="--tool-call-parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
+  *mistral*)  TP="--tool-call-parser mistral"; CT="--chat-template src/chat_templates/tool_chat_template_mistral.jinja";;
+  *)          TP="--tool-call-parser hermes";;
+esac
+
 VLLM_PID=""
 if [[ $START_SERVER -eq 1 ]]; then
   echo "Starting vLLM server on port $PORT for base model '$BASE_MODEL'..."
   CMD=(apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 "$SIF" vllm serve "$BASE_MODEL" \
     --port "$PORT" \
     --enable-auto-tool-choice \
-    --tool-call-parser hermes \
-    --reasoning-parser qwen3)
+    $CT \
+    $RP $TP)
 
   if [[ -n "$LORA_PATH" ]]; then
     CMD+=(--max-lora-rank 32 --enable-lora --lora-modules "$LORA_ADAPTER_NAME=$LORA_PATH")
