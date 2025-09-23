@@ -3,7 +3,7 @@
 #SBATCH --output=logs/swe_nano_%A_%a.out
 #SBATCH --error=logs/swe_nano_%A_%a.err
 #SBATCH --nodes=1
-#SBATCH --gpus 1
+#SBATCH --gpus 2
 #SBATCH --time=00:30:00
 #SBATCH -C "fat"
 #SBATCH --array=0-9
@@ -138,6 +138,7 @@ if [[ $START_SERVER -eq 1 ]]; then
   CMD=(apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 "$SIF" vllm serve "$BASE_MODEL" \
     --port "$PORT" \
     --enable-auto-tool-choice \
+    --max-model-len 16384 \
     $CT \
     $RP $TP)
 
