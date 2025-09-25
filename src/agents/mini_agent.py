@@ -60,8 +60,8 @@ def _process_one(data: dict[str, Any], config: AgentConfig) -> dict[str, Any]:
             "api_key": "DUMMY",
             "temperature": config.temperature,
             "drop_params": True,          # ignore extras vLLM may not support
-            "max_tokens": 16384,
-            "max_output_tokens": 16384,
+            "max_tokens": 8096,
+            "max_output_tokens": 8096,
         }
         if config.top_p is not None:
             model_kwargs["top_p"] = config.top_p
