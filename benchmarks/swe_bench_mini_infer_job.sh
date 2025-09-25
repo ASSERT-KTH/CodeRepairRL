@@ -3,7 +3,7 @@
 #SBATCH --output=logs/swe_mini_%A_%a.out
 #SBATCH --error=logs/swe_mini_%A_%a.err
 #SBATCH --nodes=1
-#SBATCH --gpus 2
+#SBATCH --gpus 1
 #SBATCH --time=00:30:00
 #SBATCH -C "fat"
 #SBATCH --array=0-9
@@ -167,9 +167,11 @@ apptainer exec $APPT_COMMON \
 
 echo "Predictions saved to $OUTPUT_DIR/preds.jsonl"
 
+# Stop vLLM if we started it
 if [[ -n "$VLLM_PID" ]]; then
   kill "$VLLM_PID" 2>/dev/null || true
   wait "$VLLM_PID" 2>/dev/null || true
 fi
+
 
 
