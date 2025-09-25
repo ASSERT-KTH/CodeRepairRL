@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Run SWE-bench evaluation using mini_agent.py (mini-swe-agent)
+Run SWE-bench evaluation using mini_agent.py (Mini-SWE-Agent backend)
 
-Interface mirrors run_nano_eval.py to keep eval flows consistent across agents.
+Interface mirrors run_nano_eval.py to keep flows consistent across agents.
 """
 
 import json
@@ -11,21 +11,23 @@ import argparse
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# Add parent dir to path to import agents
+# Add project root to path to import mini_agent
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.agents.mini_agent import _process_one  # noqa: E402
-from src.agents.nano_agent import NanoConfig  # reuse common config shape  # noqa: E402
-from datasets import load_dataset  # noqa: E402
+from src.agents.mini_agent import _process_one, AgentConfig  # type: ignore
+from datasets import load_dataset
 
 
 def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slice_spec: str, output_dir: Path):
-    """Run mini-swe-agent on SWE-bench tasks and save predictions using a process pool."""
+    """Run mini_agent on SWE-bench tasks and save predictions using a process pool."""
 
     # Load SWE-bench dataset
     dataset = load_dataset(f"princeton-nlp/SWE-bench_{subset}", split=split)
 
     # Parse slice
+    # Supported forms:
+    #   ":N"        -> first N instances
+    #   "start:end" -> instances in [start, end) zero-based half-open interval
     if slice_spec:
         if slice_spec.startswith(":"):
             dataset = dataset.select(range(int(slice_spec[1:])))
@@ -39,16 +41,13 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
                 raise ValueError("slice end must be >= start")
             dataset = dataset.select(range(start_idx, min(end_idx, len(dataset))))
 
-    # mini requires the actual served model id; strip any local routing prefix if present
-    served_model = model_name.replace("hosted_vllm/", "")
-
-    # Setup config for mini_agent
-    config = NanoConfig(
+    # Setup config for mini_agent (uses Litellm/OpenAI-compatible endpoint)
+    config = AgentConfig(
         api_base=endpoint,
-        model=served_model,
+        model=model_name,  # e.g., "hosted_vllm/Qwen/Qwen3-8B"
         token_limit=16384,
         time_limit=40,
-        tool_limit=0,
+        tool_limit=30,
         temperature=0.2,
     )
 
@@ -66,6 +65,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
     predictions: dict[str, dict] = {}
     detailed_predictions: dict[str, dict] = {}
 
+    # Run with a process pool of up to 8 workers
     max_workers = min(8, len(inputs)) if inputs else 0
     if max_workers == 0:
         print("No instances to process.")
@@ -86,6 +86,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
                 print(f"Error processing {instance_id}: {e}")
                 result = {}
 
+            # Extract model patch; prefer 'generated_diff' produced by mini_agent
             patch = (
                 result.get("generated_diff", "")
                 or result.get("patch", "")
@@ -95,7 +96,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
 
             predictions[instance_id] = {
                 "model_patch": patch or "",
-                "model_name_or_path": f"mini-swe-agent-{model_name}",
+                "model_name_or_path": f"mini-agent-{config.model}",
             }
 
             if result:
@@ -104,7 +105,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
             completed += 1
             if completed % 5 == 0 or completed == len(inputs):
                 print(f"Progress: {completed}/{len(inputs)} completed")
-
+    
     # Save predictions in JSONL format for SWE-bench harness
     output_dir.mkdir(parents=True, exist_ok=True)
     jsonl_file = output_dir / "preds.jsonl"
@@ -116,6 +117,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
                 "model_patch": pred_data["model_patch"],
             }
             f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+    
     print(f"Saved JSONL format to {jsonl_file}")
 
     # Save detailed predictions (entire result dictionaries)
@@ -125,17 +127,22 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
             obj = {"instance_id": instance_id, "detailed_predictions": det}
             f.write(json.dumps(obj, ensure_ascii=False, default=str) + "\n")
     print(f"Saved detailed predictions to {detailed_file}")
-
-    valid_count = sum(1 for _, pred in predictions.items() if pred["model_patch"])
+    
+    # Quick validation - check if patches can apply
+    valid_count = 0
+    for instance_id, pred_data in predictions.items():
+        if pred_data["model_patch"]:
+            valid_count += 1
+    
     print(f"\nSummary: {valid_count}/{len(predictions)} instances have non-empty patches")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run SWE-bench eval with mini-swe-agent")
+    parser = argparse.ArgumentParser(description="Run SWE-bench eval with mini_agent")
     parser.add_argument("--endpoint", default="http://localhost:8000/v1",
                         help="Model endpoint URL")
-    parser.add_argument("--model-name", default="Qwen/Qwen3-8B",
-                        help="Model identifier served on vLLM (e.g., 'Qwen/Qwen3-8B' or 'hosted_vllm/Qwen/Qwen3-8B' for tagging)")
+    parser.add_argument("--model-name", default="hosted_vllm/Qwen/Qwen3-8B",
+                        help="Model name passed to mini agent")
     parser.add_argument("--output-dir", default="swe_bench/results_mini",
                         help="Output directory for results")
     parser.add_argument("--subset", default="verified",
@@ -144,9 +151,9 @@ def main():
                         help="Dataset split")
     parser.add_argument("--slice", default=":25",
                         help="Slice to run. Forms: :N (first N) or start:end (half-open)")
-
+    
     args = parser.parse_args()
-
+    
     output_dir = Path(args.output_dir)
     run_evaluation(args.endpoint, args.model_name, args.subset, args.split, args.slice, output_dir)
 
