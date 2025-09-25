@@ -3,12 +3,16 @@ import time
 import logging
 import subprocess
 from typing import Any, Optional
-from dataclasses import asdict
+
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from minisweagent.agents.default import DefaultAgent
 from minisweagent.models.litellm_model import LitellmModel
+try:
+    from litellm import register_model as litellm_register_model  # optional, used to bypass pricing errors
+except Exception:  # pragma: no cover - litellm is an optional dependency in some envs
+    litellm_register_model = None
 from minisweagent.environments.local import LocalEnvironment
 
 from src.utils.git import handle_to_url, clone_repo_at_commit, clean_repo_dir
@@ -56,18 +60,34 @@ def _process_one(data: dict[str, Any], config: AgentConfig) -> dict[str, Any]:
             "api_key": "DUMMY",
             "temperature": config.temperature,
             "drop_params": True,          # ignore extras vLLM may not support
-            "max_tokens": 2048,
-            "max_output_tokens": 2048,
+            "max_tokens": 16384,
+            "max_output_tokens": 16384,
         }
         if config.top_p is not None:
             model_kwargs["top_p"] = config.top_p
         if config.top_k is not None:
             model_kwargs["top_k"] = config.top_k
 
+        # Register zero-cost pricing for the served model to avoid LiteLLM pricing errors
+        try:
+            if litellm_register_model is not None and isinstance(config.model, str) and len(config.model) > 0:
+                litellm_register_model({
+                    f"{config.model}": {
+                        "mode": "chat",
+                        "litellm_provider": "openai",
+                        "max_tokens": int(getattr(config, "token_limit", 16384)) + 2048,
+                        "input_cost_per_token": 0.0,
+                        "output_cost_per_token": 0.0,
+                    }
+                })
+        except Exception as e:
+            logger.warning(f"Failed to register LiteLLM pricing for model {config.model}: {type(e).__name__}: {e}")
+
         # use mini's defaults
         model = LitellmModel(model_name=config.model, model_kwargs=model_kwargs)
         env = LocalEnvironment(cwd=str(repo_dir), timeout=config.time_limit)
-        agent = DefaultAgent(model=model, env=env, cost_limit=0)
+        # Disable cost gating to avoid pricing lookups causing failures
+        agent = DefaultAgent(model=model, env=env)
         status, final_msg = agent.run(task=data["problem_statement"])
 
         generated = git_diff(repo_dir)
@@ -81,6 +101,8 @@ def _process_one(data: dict[str, Any], config: AgentConfig) -> dict[str, Any]:
             completion=agent.messages[2:],    # full linear history thereafter
             tools=[],                         # mini doesn't use OpenAI tools
             generated_diff=generated,
+            status=status,
+            final_message=final_msg,
         )
 
     except Exception as e:
