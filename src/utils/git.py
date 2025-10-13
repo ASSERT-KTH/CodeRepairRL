@@ -36,7 +36,7 @@ def clean_repo_dir(repo_path: str):
     assert repo_path.startswith("/tmp/") or repo_path.startswith("/var/folders/") or repo_path.startswith("/local/tmp") or repo_path.count(".tmp/") > 0, "For safety, repo_path must be a temporary directory"
     try:
         shutil.rmtree(repo_path)
-    except FileNotFoundError:
+    except:
         pass
 
 def resolve_git_commit_hash(git_commit_hash: Optional[str] = None) -> str:
