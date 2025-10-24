@@ -4,7 +4,7 @@
 #SBATCH --error=logs/medium_grpo_lora_%j.err
 #SBATCH --nodes=1
 #SBATCH --gpus 3
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH -C "fat"
 
 
@@ -35,9 +35,9 @@ esac
 
 # Context window configuration
 MAX_PROMPT_LENGTH=1024
-MAX_COMPLETION_LENGTH=12288
+MAX_COMPLETION_LENGTH=10240
 MAX_CONTEXT_LENGTH=$((MAX_PROMPT_LENGTH + MAX_COMPLETION_LENGTH))
-VLLM_CONTEXT_LENGTH=$((MAX_CONTEXT_LENGTH + 1024))  # not strictly needed, but so we don't get context window errors
+VLLM_CONTEXT_LENGTH=$((MAX_CONTEXT_LENGTH + 1024))  # small headroom to avoid context window errors
 
 
 apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 crrl.sif \

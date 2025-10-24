@@ -252,6 +252,10 @@ def main(cfg: Config) -> None:
             dataset_b = get_swe_gym_repo_repair_dataset(dataset_name="SWE-bench/SWE-bench_Multilingual").select(range(250))  # use 250, leave 50 for evals
             dataset = concatenate_datasets([dataset_a, dataset_b])
             dataset = dataset.shuffle(seed=42)
+            # Filter out problematic fastlane entry that causes cloning failures with large files
+            original_size = len(dataset)
+            dataset = dataset.filter(lambda x: not (x.get("repo") == "fastlane/fastlane"))
+            logger.info(f"Filtered out problematic entries: {original_size} -> {len(dataset)}")
         else:
             dataset = get_swe_gym_repo_repair_dataset(dataset_name=cfg.run.dataset_name)
         

@@ -31,7 +31,7 @@ max_prompt_length: 256
 max_completion_length: 256
 
 # KL to a frozen version (unmerged LoRA) with this coef
-beta: 0.04
+beta: 0.02
 
 # Reward settings
 scale_rewards: false

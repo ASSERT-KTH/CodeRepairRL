@@ -19,7 +19,7 @@ mkdir -p "${CRRL_WORKDIR}/.tmp/${SLURM_JOB_ID}" \
 # - --env: set all required environment variables inside container
 APPT_COMMON=(
   --nv
-  --cleanenv
+  # --cleanenv
   --bind "${CRRL_WORKDIR}:${CRRL_WORKDIR}"
   --home "${CRRL_WORKDIR}"                               # NEW: proper Apptainer home; remove the HOME env override
   --env "PROJECT_DIR=${CRRL_WORKDIR}"
@@ -38,6 +38,10 @@ APPT_COMMON=(
   --env "PYTHONNOUSERSITE=1"
   --env "VLLM_ALLOW_INSECURE_SERIALIZATION=1"
   --env "TORCH_NCCL_ASYNC_ERROR_HANDLING=1"
+
+  # Safe default to mitigate CUDA memory fragmentation across long runs.
+  # Can be overridden by defining PYTORCH_CUDA_ALLOC_CONF before sourcing this file.
+  --env "PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True,max_split_size_mb:512,garbage_collection_threshold:0.8}"
 
   # Keep these job-scoped (you already did this right)
   --env "TORCHINDUCTOR_CACHE_DIR=${CRRL_WORKDIR}/.cache/torchinductor_${SLURM_JOB_ID}"

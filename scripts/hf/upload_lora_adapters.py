@@ -97,7 +97,7 @@ def infer_identity(api: HfApi, provided_org: Optional[str]) -> str:
         return provided_org
     try:
         who = api.whoami()
-        return who.get("orgs")[0] if who.get("orgs") else who.get("name")
+        return who.get("orgs")[0]["name"] if who.get("orgs") else who.get("name")
     except Exception:
         raise RuntimeError(
             "Unable to infer org/user. Provide --org or ensure token is valid."

@@ -71,6 +71,15 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
         diff_success = diff != ""
         logger.info(f"[FINISH] {data['repo']} @ {data['base_commit'][:7]} - Tokens: {token_usage}, Tools: {tool_usage}, Diff Success: {diff_success}, Time: {time.time() - start_time:.2f}s")
 
+    # Ensure agent.messages has enough messages to avoid empty completion
+    if len(agent.messages) < 3:
+        logger.warning(f"Agent messages incomplete ({len(agent.messages)} messages), padding with fallback")
+        # Pad with user message and empty assistant response
+        if len(agent.messages) < 2:
+            agent._append({"role": "user", "content": data["problem_statement"]})
+        if len(agent.messages) < 3:
+            agent._append({"role": "assistant", "content": ""})
+    
     result = dict(
         prompt=agent.messages[:2],
         completion=agent.messages[2:],

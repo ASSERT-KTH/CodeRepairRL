@@ -3,7 +3,6 @@ defaults:
 
 # GSPO with no modifications and our custom Liger Kernel
 loss_type: grpo  # needs to be this value to actually work as GSPO
-use_liger_loss: true  # added support for GSPO by forking liger-kernel
 importance_sampling_level: "sequence"  # GRPO assigns importance weights per token, which is very unstable
 mask_tool_responses: false
 scale_rewards: true
@@ -17,3 +16,7 @@ num_iterations: 1  # we cache the generated rollouts and update on them twice (t
 
 # GSPO describes having no KL, but a small beta helps stabilize our multi-turn / long context runs
 beta: 0.02
+
+# clipping
+epsilon: 2e-5
+epsilon_high: 4e-4
