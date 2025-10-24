@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Run SWE-bench evaluation using nano_agent.py
+Run SWE-bench evaluation using mini_agent.py (Mini-SWE-Agent backend)
 
-This file intentionally mirrors the interface of run_aider_eval.py to keep
-eval flows consistent across agents.
+Interface mirrors run_nano_eval.py to keep flows consistent across agents.
 """
 
 import json
@@ -12,15 +11,15 @@ import argparse
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# Add parent dir to path to import nano_agent
+# Add project root to path to import mini_agent
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.agents.nano_agent import _process_one, NanoConfig
+from src.agents.mini_agent import _process_one, AgentConfig  # type: ignore
 from datasets import load_dataset
 
 
 def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slice_spec: str, output_dir: Path):
-    """Run nano_agent on SWE-bench tasks and save predictions using a process pool."""
+    """Run mini_agent on SWE-bench tasks and save predictions using a process pool."""
 
     # Load SWE-bench dataset
     dataset = load_dataset(f"princeton-nlp/SWE-bench_{subset}", split=split)
@@ -29,13 +28,10 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
     # Supported forms:
     #   ":N"        -> first N instances
     #   "start:end" -> instances in [start, end) zero-based half-open interval
-    #   "start:count" when suffixed with "+" as in "start+count" is NOT supported to avoid ambiguity
     if slice_spec:
         if slice_spec.startswith(":"):
-            # first N
             dataset = dataset.select(range(int(slice_spec[1:])))
         elif ":" in slice_spec:
-            # start:end range
             start_str, end_str = slice_spec.split(":", 1)
             start_idx = int(start_str)
             end_idx = int(end_str)
@@ -45,10 +41,10 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
                 raise ValueError("slice end must be >= start")
             dataset = dataset.select(range(start_idx, min(end_idx, len(dataset))))
 
-    # Setup config for nano_agent
-    config = NanoConfig(
+    # Setup config for mini_agent (uses Litellm/OpenAI-compatible endpoint)
+    config = AgentConfig(
         api_base=endpoint,
-        model=model_name,  # e.g., "nano" for LoRA
+        model=model_name,  # e.g., "hosted_vllm/Qwen/Qwen3-8B"
         token_limit=16384,
         time_limit=40,
         tool_limit=30,
@@ -90,7 +86,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
                 print(f"Error processing {instance_id}: {e}")
                 result = {}
 
-            # Extract model patch; prefer 'generated_diff' produced by nano_agent
+            # Extract model patch; prefer 'generated_diff' produced by mini_agent
             patch = (
                 result.get("generated_diff", "")
                 or result.get("patch", "")
@@ -100,10 +96,9 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
 
             predictions[instance_id] = {
                 "model_patch": patch or "",
-                "model_name_or_path": f"nano-agent-{config.model}",
+                "model_name_or_path": f"mini-agent-{config.model}",
             }
 
-            # Store the entire result dictionary for detailed analysis
             if result:
                 detailed_predictions[instance_id] = result
 
@@ -143,12 +138,12 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run SWE-bench eval with nano_agent")
+    parser = argparse.ArgumentParser(description="Run SWE-bench eval with mini_agent")
     parser.add_argument("--endpoint", default="http://localhost:8000/v1",
                         help="Model endpoint URL")
-    parser.add_argument("--model-name", default="nano",
-                        help="Model name to use (e.g., 'nano' for LoRA, base model name for baseline)")
-    parser.add_argument("--output-dir", default="swe_bench/results_nano",
+    parser.add_argument("--model-name", default="hosted_vllm/Qwen/Qwen3-8B",
+                        help="Model name passed to mini agent")
+    parser.add_argument("--output-dir", default="swe_bench/results_mini",
                         help="Output directory for results")
     parser.add_argument("--subset", default="verified",
                         help="SWE-bench subset (verified, lite, full)")
@@ -165,3 +160,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
