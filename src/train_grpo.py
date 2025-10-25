@@ -165,7 +165,10 @@ OmegaConf.register_new_resolver("resolve_git_commit_hash", resolve_git_commit_ha
 
 @hydra.main(version_base="1.1", config_path="conf", config_name="grpo_config")
 def main(cfg: Config) -> None:
-    wandb.login(key=os.environ["WANDB_API_KEY"])
+    try:
+        whoami()
+    except Exception:
+        raise ValueError("Not logged in to HuggingFace. Please run 'huggingface-cli login' first.")
     
     # Validate that run_name is provided and not empty
     if not cfg.grpo.run_name or cfg.grpo.run_name.strip() == "":
@@ -186,13 +189,6 @@ def main(cfg: Config) -> None:
     logger.info("=" * 50)
     
     os.environ["WANDB_PROJECT"] = cfg.run.wandb_project
-
-    # Check HuggingFace login if pushing to hub
-    if cfg.run.push_to_hub:
-        try:
-            whoami()
-        except Exception:
-            raise ValueError("Not logged in to HuggingFace. Please run 'huggingface-cli login' first.")
 
     # Log precision settings
     precision_mode = torch.bfloat16 if cfg.grpo.bf16 else torch.float16 if cfg.grpo.fp16 else torch.float32
@@ -292,9 +288,12 @@ def main(cfg: Config) -> None:
     grpo_params = OmegaConf.to_container(cfg.grpo, resolve=True)
     grpo_params["reward_weights"] = reward_weights
     grpo_params["output_dir"] = f"outputs/{cfg.grpo.run_name}"
+    
+    # Extract resume_from_checkpoint before creating training args (it's not a TrainingArguments parameter)
+    resume_checkpoint = grpo_params.pop("resume_from_checkpoint", None)
     training_args = HFGRPOConfig(**grpo_params)
 
-    logger.info(f"Resuming from checkpoint: {cfg.grpo.resume_from_checkpoint}")
+    logger.info(f"Resuming from checkpoint: {resume_checkpoint}")
 
     # Initialize trainer with task-specific reward functions
     trainer = HFGRPOTrainer(
@@ -307,7 +306,11 @@ def main(cfg: Config) -> None:
         peft_config=lora_config
     )
 
-    trainer.train(resume_from_checkpoint=cfg.grpo.resume_from_checkpoint is not None)
+    # Properly pass the checkpoint path if provided; otherwise start fresh
+    if resume_checkpoint:
+        trainer.train(resume_from_checkpoint=resume_checkpoint)
+    else:
+        trainer.train()
 
     # Save with task-specific name
     model_save_path = f"grpo_{cfg.run.task_type}_model"

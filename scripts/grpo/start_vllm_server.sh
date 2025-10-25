@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Start vLLM server for GRPO training
-# Usage: ./start_vllm_server.sh [--model_config <name>]
-
 set -e
 
 # MODEL_CONFIG can be provided via env or as --model_config <name>
