@@ -1,0 +1,8 @@
+litellm_settings:
+  drop_params: true
+
+model_list:
+  - model_name: devstral-small-2507        # what run_nano_eval.py will ask for
+    litellm_params:
+      model: mistral/devstral-small-2507  # LiteLLM infers provider from the prefix
+      api_base: https://api.mistral.ai/v1 # optional, but explicit is fine

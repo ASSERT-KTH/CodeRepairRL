@@ -36,6 +36,7 @@ dependencies = [
     # when python >= 3.12, wandb crashes on importlib-metadata when any .dist-info folder has a missing Name: field
     "wandb>=0.18.4",
     "swebench>=4.1.0",
+    "litellm[proxy]>=1.79.3",
 ]
 
 [project.optional-dependencies]
