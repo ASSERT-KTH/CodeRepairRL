@@ -3,18 +3,11 @@
 set -euo pipefail
 
 ROOT_DIR="~/CodeRepairRL"
-PYTHON_BIN="${ROOT_DIR}/.venv/bin/python"
 LITELLM_BIN="$(command -v litellm)"
 LITELLM_CONFIG="${ROOT_DIR}/litellm_config.yaml"
 LITELLM_PORT="8000"
 LITELLM_HOST="0.0.0.0"
 LITELLM_BASE="http://${LITELLM_HOST}:${LITELLM_PORT}/v1"
-
-if [[ ! -x "${PYTHON_BIN}" ]]; then
-  echo "Expected python virtualenv at ${PYTHON_BIN} not found or not executable."
-  echo "Activate your environment or adjust PYTHON_BIN in this script."
-  exit 1
-fi
 
 if [[ -z "${LITELLM_BIN}" ]]; then
   echo "litellm CLI not found in PATH. Install litellm before running."
@@ -66,7 +59,7 @@ for attempt in {1..30}; do
 done
 
 echo "Running nano agent evaluation..."
-"${PYTHON_BIN}" "${ROOT_DIR}/benchmarks/swe_bench/run_nano_eval.py" \
+python "${ROOT_DIR}/benchmarks/swe_bench/run_nano_eval.py" \
   --endpoint "${LITELLM_BASE}" \
   --model-name "openai/devstral-small-2507" \
   --output-dir "${ROOT_DIR}/swe_bench/results_devstral" \
