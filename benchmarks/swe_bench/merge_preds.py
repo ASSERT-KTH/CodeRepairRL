@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Merge preds.jsonl files from multiple shards into a single file.
+Merge preds.jsonl and detailed_predictions.jsonl files from multiple shards into single files.
 
 Expected layout (per run):
   benchmarks/swe_bench/results/<run_tag>/shard_<TASK_ID>/preds.jsonl
+  benchmarks/swe_bench/results/<run_tag>/shard_<TASK_ID>/detailed_predictions.jsonl
 
 Where <run_tag> encodes scaffold and model, e.g.:
   nano-agent-hosted_vllm__Qwen__Qwen3-8B
@@ -25,6 +26,8 @@ Usage examples:
       python3 benchmarks/swe_bench/merge_preds.py \
         --inputs path/to/shard_0/preds.jsonl path/to/shard_1/preds.jsonl \
         --output path/to/preds.jsonl
+
+Note: This script merges both preds.jsonl and detailed_predictions.jsonl when available.
 """
 
 from __future__ import annotations
@@ -91,11 +94,11 @@ def numeric_suffix(path: Path) -> Tuple[int, str]:
     return (10**9, name)
 
 
-def discover_input_files(root: Path, pattern: str) -> List[Path]:
+def discover_input_files(root: Path, pattern: str, filename: str = "preds.jsonl") -> List[Path]:
     shard_dirs = sorted((p for p in root.glob(pattern) if p.is_dir()), key=numeric_suffix)
     inputs: List[Path] = []
     for shard_dir in shard_dirs:
-        candidate = shard_dir / "preds.jsonl"
+        candidate = shard_dir / filename
         if candidate.is_file():
             inputs.append(candidate)
         else:
@@ -170,13 +173,13 @@ def main() -> None:
             # If input_root already looks like a run directory (contains shard_*), use it directly.
             has_shards = any(p.is_dir() and p.name.startswith("shard_") for p in input_root.iterdir()) if input_root.exists() else False
             run_root = input_root if has_shards else input_root
-        input_files = discover_input_files(run_root, args.pattern)
+        input_files = discover_input_files(run_root, args.pattern, "preds.jsonl")
 
     if not input_files:
         print("[error] No input files found", file=sys.stderr)
         sys.exit(2)
 
-    print(f"Merging {len(input_files)} file(s):")
+    print(f"Merging {len(input_files)} preds.jsonl file(s):")
     for p in input_files:
         print(f" - {p}")
 
@@ -194,6 +197,25 @@ def main() -> None:
             output_path = Path(args.input_root) / "preds.jsonl"
     write_jsonl(merged, output_path)
     print(f"Wrote: {output_path}")
+
+    # Also merge detailed_predictions.jsonl if available
+    if not args.inputs:
+        detailed_input_files = discover_input_files(run_root, args.pattern, "detailed_predictions.jsonl")
+
+        if detailed_input_files:
+            print(f"\nMerging {len(detailed_input_files)} detailed_predictions.jsonl file(s):")
+            for p in detailed_input_files:
+                print(f" - {p}")
+
+            detailed_merged = merge_preds(detailed_input_files, args.dedup)
+            print(f"Total merged detailed instances: {len(detailed_merged)}")
+
+            # Determine output path for detailed predictions
+            detailed_output_path = output_path.parent / "detailed_predictions.jsonl"
+            write_jsonl(detailed_merged, detailed_output_path)
+            print(f"Wrote: {detailed_output_path}")
+        else:
+            print("\n[info] No detailed_predictions.jsonl files found to merge")
 
 
 if __name__ == "__main__":
