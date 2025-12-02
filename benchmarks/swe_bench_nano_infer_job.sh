@@ -4,7 +4,7 @@
 #SBATCH --error=logs/swe_nano_%A_%a.err
 #SBATCH --nodes=1
 #SBATCH --gpus 1
-#SBATCH --time=00:30:00
+#SBATCH --time=06:00:00
 #SBATCH -C "fat"
 #SBATCH --array=0-9
 
@@ -25,6 +25,7 @@ SLICE=""
 PORT=8000
 SIF="benchmarks/benchmark_container.sif"
 START_SERVER=1
+WANDB_API_KEY=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -117,7 +118,7 @@ wait_for_vllm() {
   while (( tries-- > 0 )); do
     code=$(curl -s -o /dev/null -w "%{http_code}" "$url/models" || true)
     if [[ "$code" == "200" ]]; then return 0; fi
-    sleep 2
+    sleep 10
   done
   return 1
 }
@@ -135,10 +136,15 @@ esac
 VLLM_PID=""
 if [[ $START_SERVER -eq 1 ]]; then
   echo "Starting vLLM server on port $PORT for base model '$BASE_MODEL'..."
-  CMD=(apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 "$SIF" vllm serve "$BASE_MODEL" \
+  CMD=(apptainer exec $APPT_COMMON --env VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 "$SIF" vllm serve "$BASE_MODEL" \
     --port "$PORT" \
     --enable-auto-tool-choice \
-    --max-model-len 16384 \
+    # --tensor-parallel-size 8 \
+    # --max-model-len 65536 \
+    --max-model-len 50000 \
+    --enable_prefix_caching \
+    --rope-scaling '{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}' \
+    --gpu-memory-utilization 0.94 \
     $CT \
     $RP $TP)
 
