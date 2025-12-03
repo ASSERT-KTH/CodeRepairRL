@@ -6,7 +6,7 @@
 #SBATCH --gpus 1
 #SBATCH --time=06:00:00
 #SBATCH -C "fat"
-#SBATCH --array=0-9
+#SBATCH --array=0-19
 
 set -euo pipefail
 
@@ -18,7 +18,7 @@ BASE_MODEL="Qwen/Qwen3-8B"     # HF model to serve with vLLM
 LORA_PATH=""                    # Optional LoRA path; adapter name auto-derived from basename if set
 MODEL_NAME=""                   # Model name passed to the agent; auto-derived if empty
 SCAFFOLD="nano-agent"           # Scaffold identifier for run tagging
-OUTPUT_BASE_DIR="swe_bench/results"
+OUTPUT_BASE_DIR="swe_bench/results_apptainer"
 SUBSET="verified"
 SPLIT="test"
 SLICE=""
@@ -56,7 +56,7 @@ done
 
 # Derive slice and per-task settings when running as a SLURM array
 TASK_ID=${SLURM_ARRAY_TASK_ID:-0}
-SHARD_SIZE=50
+SHARD_SIZE=25
 
 # Auto-compute slice if not explicitly provided
 if [[ -z "$SLICE" ]]; then
@@ -143,7 +143,7 @@ if [[ $START_SERVER -eq 1 ]]; then
     # --max-model-len 65536 \
     --max-model-len 50000 \
     --enable_prefix_caching \
-    --rope-scaling '{"rope_type":"yarn","factor":2.0,"original_max_position_embeddings":32768}' \
+    --rope-scaling '{"rope_type":"yarn","factor":1.52,"original_max_position_embeddings":32768}' \
     --gpu-memory-utilization 0.94 \
     $CT \
     $RP $TP)
@@ -165,16 +165,16 @@ if [[ $START_SERVER -eq 1 ]]; then
 fi
 
 echo "Running nano_agent evaluation with model '$MODEL_NAME'..."
-apptainer exec $APPT_COMMON \
-  --env OPENAI_API_BASE="$ENDPOINT" \
-  --env OPENAI_API_KEY="dummy" \
-  "$SIF" python3 benchmarks/swe_bench/run_nano_eval.py \
-    --endpoint "$ENDPOINT" \
-    --model-name "hosted_vllm/$MODEL_NAME" \
-    --output-dir "$OUTPUT_DIR" \
-    --subset "$SUBSET" \
-    --split "$SPLIT" \
-    --slice "$SLICE"
+OPENAI_API_BASE="$ENDPOINT" \
+OPENAI_API_KEY="dummy" \
+uv run python benchmarks/swe_bench/run_nano_eval.py \
+  --endpoint "$ENDPOINT" \
+  --model-name "hosted_vllm/$MODEL_NAME" \
+  --output-dir "$OUTPUT_DIR" \
+  --subset "$SUBSET" \
+  --split "$SPLIT" \
+  --slice "$SLICE" \
+  --backend "apptainer"
 
 echo "Predictions saved to $OUTPUT_DIR/preds.jsonl"
 
