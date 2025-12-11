@@ -9,6 +9,8 @@ set -euo pipefail
 #     --run-id my_run \
 #     [--max-workers 8]
 #
+# Note: --run-id is required
+#
 # Requirements (on this CPU server):
 #   pip install swebench
 #   Docker installed and running
@@ -16,7 +18,7 @@ set -euo pipefail
 subset="verified"
 split="test"
 preds=""
-run_id="swebench_local_run"
+run_id=""
 max_workers="8"
 
 while [[ $# -gt 0 ]]; do
@@ -38,6 +40,11 @@ done
 
 if [[ -z "$preds" ]]; then
   echo "ERROR: --preds /path/to/preds.jsonl is required" >&2
+  exit 1
+fi
+
+if [[ -z "$run_id" ]]; then
+  echo "ERROR: --run-id is required" >&2
   exit 1
 fi
 
@@ -69,4 +76,9 @@ python -m swebench.harness.run_evaluation \
   --cache_level "instance" \
   --timeout 3600
 
+# Clean up logs directory
+if [[ -d "logs/run_evaluation/$run_id" ]]; then
+  echo "Cleaning up logs directory: logs/run_evaluation/$run_id"
+  rm -rf "logs/run_evaluation/$run_id"
+fi
 
