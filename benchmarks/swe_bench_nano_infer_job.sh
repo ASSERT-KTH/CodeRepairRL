@@ -3,10 +3,10 @@
 #SBATCH --output=logs/swe_nano_%A_%a.out
 #SBATCH --error=logs/swe_nano_%A_%a.err
 #SBATCH --nodes=1
-#SBATCH --gpus 1
-#SBATCH --time=06:00:00
+#SBATCH --gpus 8
+#SBATCH --time=12:00:00
 #SBATCH -C "fat"
-#SBATCH --array=0-19
+#SBATCH --array=0
 
 set -euo pipefail
 
@@ -56,7 +56,7 @@ done
 
 # Derive slice and per-task settings when running as a SLURM array
 TASK_ID=${SLURM_ARRAY_TASK_ID:-0}
-SHARD_SIZE=25
+SHARD_SIZE=500
 
 # Auto-compute slice if not explicitly provided
 if [[ -z "$SLICE" ]]; then
@@ -134,17 +134,17 @@ case "${BASE_MODEL,,}" in
 esac
 
 VLLM_PID=""
+export MAX_CONTEXT_LEN=65536
+export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
 if [[ $START_SERVER -eq 1 ]]; then
   echo "Starting vLLM server on port $PORT for base model '$BASE_MODEL'..."
-  CMD=(apptainer exec $APPT_COMMON --env VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 "$SIF" vllm serve "$BASE_MODEL" \
+  CMD=(uv run vllm serve $BASE_MODEL \
     --port "$PORT" \
     --enable-auto-tool-choice \
-    # --tensor-parallel-size 8 \
-    # --max-model-len 65536 \
-    --max-model-len 50000 \
+    --tensor-parallel-size 8 \
+    --max-model-len $MAX_CONTEXT_LEN \
+    --hf-overrides '{"max_position_embeddings": '$MAX_CONTEXT_LEN'}' \
     --enable_prefix_caching \
-    --rope-scaling '{"rope_type":"yarn","factor":1.52,"original_max_position_embeddings":32768}' \
-    --gpu-memory-utilization 0.94 \
     $CT \
     $RP $TP)
 
@@ -153,7 +153,7 @@ if [[ $START_SERVER -eq 1 ]]; then
   fi
 
   # Start server in background and capture PID
-  "${CMD[@]}" > "logs/vllm_${SLURM_JOB_ID:-$$}.log" 2>&1 &
+  (cd /proj/berzelius-2024-336/users/x_andaf/R2E-Gym/ && exec "${CMD[@]}") > "logs/vllm_${SLURM_JOB_ID:-$$}.log" 2>&1 &
   VLLM_PID=$!
   trap 'if [[ -n "$VLLM_PID" ]]; then kill "$VLLM_PID" 2>/dev/null || true; fi' EXIT
 
