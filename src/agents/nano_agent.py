@@ -66,6 +66,10 @@ def setup_env_swebench(env: Environment):
     # Install ripgrep
     env.run_shell("apt-get update && apt-get install -y ripgrep 2>/dev/null || true")
 
+    # Commit all changes to ensure we have a clean state
+    env.run_shell("git config --global user.email 'you@example.com'")
+    env.run_shell("git config --global user.name 'Your Name'")
+    env.run_shell("git add . && git commit -m 'add changes'")
 
 @dataclass
 class NanoConfig:
