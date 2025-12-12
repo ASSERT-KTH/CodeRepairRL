@@ -15,4 +15,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-nano-agent = { git = "https://github.com/ASSERT-KTH/nano-agent", branch = "andre/feat/remote-env" }
+nano-agent = { git = "https://github.com/ASSERT-KTH/nano-agent", branch = "andre/fix/apptainer_sweb_env" }

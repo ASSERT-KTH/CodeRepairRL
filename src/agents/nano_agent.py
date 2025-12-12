@@ -6,10 +6,65 @@ from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor
 
 from nano import Agent
+from nano.env import Environment, ApptainerEnvironment
 
 from src.utils.git import handle_to_url, clone_repo_at_commit, clean_repo_dir
 
 logger = logging.getLogger(__name__)
+
+
+def setup_env_swebench(env: Environment):
+    """
+    Mimics the R2E-Gym setup function with both swebench and non-swebench paths.
+    Detects which type of image we're using and applies the appropriate setup.
+    """
+    repo_path = "/testbed"
+    alt_path = "/root"
+    
+    # Set the PATH for all subsequent commands
+    DOCKER_PATH = "/root/.venv/bin:/root/.local/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    env.path = DOCKER_PATH
+    
+    # === setup_env_swebench path ===
+    # Make run_tests.sh executable (if present)
+    # We will not use this script in nano-agent
+    # env.run_shell("chmod +x /run_tests.sh 2>/dev/null || true")
+    
+    # Create symlink of conda env to /root/.venv
+    env.run_shell("ln -sf /opt/miniconda3/envs/testbed /root/.venv")
+    
+    # Install required packages
+    env.run_shell("python -m pip install chardet -q")
+    
+    # === setup_env (non-swebench R2E-Gym) path ===
+    # Create local bin directory if needed
+    env.run_shell(f"mkdir -p {alt_path}/.local/bin")
+    
+    # Symlink python executables
+    env.run_shell(f"ln -sf {repo_path}/.venv/bin/python {alt_path}/.local/bin/python")
+    env.run_shell(f"ln -sf {repo_path}/.venv/bin/python {alt_path}/.local/bin/python3")
+    
+    # Symlink all executables from venv bin
+    env.run_shell(f"find {repo_path}/.venv/bin -type f -executable -exec ln -sf {{}} {alt_path}/.local/bin/ \\;")
+    
+    # Clean up pycache files
+    env.run_shell("find . -name '*.pyc' -delete 2>/dev/null || true")
+    env.run_shell("find . -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true")
+    
+    # Clean up pycache from r2e_tests (if present)
+    env.run_shell("find /r2e_tests -name '*.pyc' -delete 2>/dev/null || true")
+    env.run_shell("find /r2e_tests -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true")
+    
+    # Move r2e_tests to /root (if present)
+    # We will not use this script in nano-agent
+    # env.run_shell(f"mv /r2e_tests {alt_path}/r2e_tests 2>/dev/null || true")
+    
+    # Create symlink for r2e_tests in repo
+    # We will not use this script in nano-agent
+    # env.run_shell(f"ln -sf {alt_path}/r2e_tests {repo_path}/r2e_tests 2>/dev/null || true")
+    
+    # Install ripgrep
+    env.run_shell("apt-get update && apt-get install -y ripgrep 2>/dev/null || true")
 
 
 @dataclass
@@ -51,15 +106,11 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
         # expect the caller to pass the fully constructed environment in `config.env`.
         # Based on the reference, the caller (run_nano_eval) should likely construct the environment.
         # However, `_process_one` is called per instance, and the environment depends on the instance ID.
-        
-        from nano.env import ApptainerEnvironment
-        instance_id = data.get("instance_id", "")
-        if instance_id:
-            #  image_name = f"ghcr.io/epoch-research/swe-bench.eval.x86_64.{instance_id}:latest"
-             image_name = f"docker.io/swebench/sweb.eval.x86_64.{instance_id.replace('__', '_1776_')}:latest"
-             workdir = "/testbed"
-             env = ApptainerEnvironment(image=f"docker://{image_name}", workdir=workdir)
-             agent_kwargs["env"] = env
+        instance_id = data.get("instance_id")
+        image_name = f"docker.io/slimshetty/swebench-verified:sweb.eval.x86_64.{instance_id}"
+        workdir = "/testbed"
+        env = ApptainerEnvironment(image=f"docker://{image_name}", workdir=workdir, setup_fn=setup_env_swebench)
+        agent_kwargs["env"] = env
     elif env:
         agent_kwargs["env"] = env
 
