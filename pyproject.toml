@@ -30,4 +30,4 @@ dev = ["pytest>=8.3.4", "matplotlib>=3.10.0", "scikit-learn>=1.6.1"]
 [tool.uv]
 no-build-isolation-package = ["flash-attn", "flashinfer-python"]  
 [tool.uv.sources]
-nano-agent = { git = "https://github.com/ASSERT-KTH/nano-agent", branch = "andre/feat/remote-env" }
+nano-agent = { git = "https://github.com/ASSERT-KTH/nano-agent", branch = "andre/fix/apptainer_sweb_env" }
