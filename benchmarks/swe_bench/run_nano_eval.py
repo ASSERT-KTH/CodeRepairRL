@@ -49,7 +49,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
     config = NanoConfig(
         api_base=endpoint,
         model=model_name,  # e.g., "nano" for LoRA
-        token_limit=50000,
+        token_limit=65536,
         time_limit=600,
         tool_limit=100,
         temperature=1.0,
@@ -71,7 +71,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
     detailed_predictions: dict[str, dict] = {}
 
     # Run with a process pool of up to 8 workers
-    max_workers = min(4, len(inputs)) if inputs else 0
+    max_workers = min(48, len(inputs)) if inputs else 0
     if max_workers == 0:
         print("No instances to process.")
         return

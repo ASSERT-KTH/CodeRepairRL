@@ -41,8 +41,9 @@ def main():
     for i, instance in enumerate(dataset):
         instance_id = instance["instance_id"]
         # Image naming convention: replace double underscore with _1776_
-        image_name_tag = instance_id.replace("__", "_1776_")
-        image_uri = f"docker://docker.io/swebench/sweb.eval.x86_64.{image_name_tag}:latest"
+        # image_name_tag = instance_id.replace("__", "_1776_")
+        # image_uri = f"docker://docker.io/swebench/sweb.eval.x86_64.{image_name_tag}:latest"
+        image_uri = f"docker://slimshetty/swebench-verified:sweb.eval.x86_64.{instance_id}"
         
         print(f"[{i+1}/{len(dataset)}] Pulling {image_uri}...")
         try:
