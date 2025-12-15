@@ -194,6 +194,98 @@ uv run pytest tests/test_search_replace_diff.py
 uv run pytest tests/test_search_replace_diff.py::test_specific_function
 ```
 
+## Trajectory Analyzer
+
+The trajectory analyzer toolkit loads agent trajectories from multiple formats, extracts metrics, and generates comparative visualizations. It's useful for analyzing tool usage patterns, comparing models across scaffolds, and studying transfer learning effects.
+
+### Supported Formats
+
+- **nano-agent**: `detailed_predictions.jsonl` with OpenAI chat format
+- **R2E-Gym**: JSONL with `trajectory_steps` using XML function calls
+- **SWE-agent**: Log files with `🎬 ACTION` markers
+
+### Quick Start
+
+```bash
+# Run with the example config (adjust paths in the config file first)
+uv run python -m src.trajectory_analyzer --config-name example_config
+
+# Generate specific plots
+uv run python -m src.trajectory_analyzer --config-name example_config \
+    'plots=[tool_distribution,comparison,transfer_analysis]' \
+    output_dir=./my_plots
+```
+
+### Configuration
+
+Create a YAML config file (see `src/trajectory_analyzer/conf/example_config.yaml`):
+
+```yaml
+output_dir: "./plots"
+
+plots:
+  - tool_distribution           # Bar chart of tool usage per run
+  - shell_command_distribution  # Bar chart of shell commands
+  - success_rates               # Resolution rates and tool success
+  - token_analysis              # Token usage by success
+  - comparison                  # Multi-run comparison grid
+  - transfer_analysis           # Cross-scaffold transfer analysis
+
+# For transfer learning analysis: map models to their training scaffold
+model_to_trained_scaffold:
+  "agentica-org/DeepSWE-Preview": "r2e-gym"
+
+runs:
+  - name: "deepswe-nano-agent"
+    format: "nano_agent"
+    trajectories: "/path/to/detailed_predictions.jsonl"
+    results: "/path/to/swebench_results.json"  # optional
+    base_model: "agentica-org/DeepSWE-Preview"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  - name: "deepswe-r2e-gym"
+    format: "r2e_gym"
+    trajectories: "/path/to/trajectories.jsonl"
+    results: null  # uses reward field from trajectory
+    base_model: "agentica-org/DeepSWE-Preview"
+    scaffold: "r2e-gym"
+    lora_adapter: null
+```
+
+### Programmatic Usage
+
+```python
+from src.trajectory_analyzer.loaders import NanoAgentLoader, R2EGymLoader
+from src.trajectory_analyzer.analysis import MetricsExtractor, RunComparator
+from src.trajectory_analyzer.plotting import TrajectoryPlotter
+
+# Load trajectories
+loader = NanoAgentLoader()
+run = loader.load_run(
+    name="my-run",
+    scaffold="nano-agent",
+    base_model="Qwen/Qwen3-32B",
+    trajectories_path="path/to/detailed_predictions.jsonl",
+    results_path="path/to/results.json",  # optional
+)
+
+# Extract metrics
+extractor = MetricsExtractor()
+metrics = extractor.extract_run_metrics(run)
+print(f"Resolved: {metrics.resolved_instances}/{metrics.total_instances}")
+print(f"Avg tool calls: {metrics.avg_tool_calls:.1f}")
+
+# Compare runs
+comparator = RunComparator()
+transfer = comparator.analyze_transfer(source_run, target_run, "r2e-gym")
+print(f"Transfer delta: {transfer.transfer_delta:+.1%}")
+
+# Generate plots
+plotter = TrajectoryPlotter(output_dir="./plots")
+plotter.plot_all([run1, run2], plots=["comparison", "tool_distribution"])
+```
+
 ## Documentation Structure
 
 This repository uses several Markdown files to organize information:
