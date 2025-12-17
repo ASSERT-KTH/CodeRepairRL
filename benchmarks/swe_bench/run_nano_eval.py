@@ -51,7 +51,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
         model=model_name,  # e.g., "nano" for LoRA
         token_limit=65536,
         time_limit=600,
-        tool_limit=100,
+        tool_limit=500,
         temperature=1.0,
         backend=backend,
     )
