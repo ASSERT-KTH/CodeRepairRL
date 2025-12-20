@@ -10,15 +10,12 @@
 
 set -euo pipefail
 
-# Use common Apptainer runtime config (requires CRRL_WORKDIR in env)
-source scripts/appt_common.sh
-
 # Defaults
 BASE_MODEL="Qwen/Qwen3-8B"     # HF model to serve with vLLM
 LORA_PATH=""                    # Optional LoRA path; adapter name auto-derived from basename if set
 MODEL_NAME=""                   # Model name passed to the agent; auto-derived if empty
 SCAFFOLD="nano-agent"           # Scaffold identifier for run tagging
-OUTPUT_BASE_DIR="swe_bench/results_apptainer_500_tool_calls"
+OUTPUT_BASE_DIR="swe_bench/"
 SUBSET="verified"
 SPLIT="test"
 SLICE=""
