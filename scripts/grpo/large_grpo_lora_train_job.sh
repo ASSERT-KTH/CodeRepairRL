@@ -55,9 +55,9 @@ apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=2,3,4,5 crrl.sif accelera
         grpo.max_prompt_length=$MAX_PROMPT_LENGTH \
         grpo.max_completion_length=$MAX_COMPLETION_LENGTH \
         grpo.num_generations=4 \
-        grpo.generation_batch_size=8 \
+        grpo.generation_batch_size=32 \
         grpo.per_device_train_batch_size=1 \
-        grpo.gradient_accumulation_steps=4 \
+        grpo.gradient_accumulation_steps=8 \
         grpo.optim="adamw_torch" \
         "$@"  # pass any additional arguments
     
