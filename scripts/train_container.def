@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: vllm/vllm-openai:v0.10.0
+From: vllm/vllm-openai:v0.11.0
 
 %environment
     # Keep container largely stateless; runtime env is passed via --env from host
@@ -15,10 +15,10 @@ From: vllm/vllm-openai:v0.10.0
     
     pip install --upgrade pip
     pip install -e .
-
-    pip install torch==2.7.1+cu128 --index-url https://download.pytorch.org/whl/cu128
     
-    # we pin the version since we need prebuilt binaries to be able to install
-    pip install --no-build-isolation --prefer-binary flash-attn==2.8.0.post2
-    pip install --no-build-isolation flashinfer-python
+    # flash-attn is needed by transformers for attn_implementation="flash_attention_2" during training
+    # (vLLM only bundles it for inference, not as an importable package)
+    # Using --no-cache-dir to avoid cross-device link errors in container builds
+    pip install --no-build-isolation --no-cache-dir flash-attn==2.8.3
+    pip install --no-build-isolation --no-cache-dir flashinfer-python==0.5.0
     
