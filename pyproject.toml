@@ -5,14 +5,37 @@ description = "Finetuning LLMs with RL to improve program repair capabilities"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "datasets>=4.4.1",
-    "gitpython>=3.1.45",
-    "hydra-core>=1.3.2",
-    "matplotlib>=3.10.8",
+    # Our fork of trl
+    "trl @ git+https://github.com/ASSERT-KTH/trl.git@dev",
+    # The agent we use for rollout generation,
+    "nano-agent @ git+https://github.com/ASSERT-KTH/nano-agent.git",
     "mini-swe-agent>=1.17.0",
-    "nano-agent",
-    "vllm==0.11.0",
+    # Optimized loss kernels, forked to support GSPO
+    "liger-kernel @ git+https://github.com/BjarniHaukur/liger-kernel.git",
+    # Other HF stuff
+    "accelerate>=1.8.0",
+    "transformers",
+    "huggingface-hub",
+    "datasets>=4.4.1",
+    "peft>=0.15.0",
+    "bitsandbytes>=0.44.1; platform_system != 'Darwin'",
+    # Logging
     "wandb>=0.23.0",
+    # Config
+    "hydra-core>=1.3.2",
+    # Needed for SWE-Gym, to clone the repos
+    "gitpython>=3.1.45",
+    # Is required BEFORE the package manager considers vLLM flash-attn
+    "setuptools>=75.8.0",
+    # efficient training of LLMs
+    "deepspeed",
+    # The following is not strictly needed by crrl, but libraries incorrectly pin requirements so we need to narrow them
+    # accelerate installs incorrect version of boto3 without explicitly defining a lower bound
+    "boto3>=1.34,<2",
+    "botocore>=1.34,<2",
+    # when python >= 3.12, wandb crashes on importlib-metadata when any .dist-info folder has a missing Name: field
+    "wandb>=0.18.4",
+    "swebench>=4.1.0",
 ]
 
 [project.optional-dependencies]
@@ -30,5 +53,3 @@ dev = ["pytest>=8.3.4", "matplotlib>=3.10.0", "scikit-learn>=1.6.1"]
 
 [tool.uv]
 no-build-isolation-package = ["flash-attn", "flashinfer-python"]  
-[tool.uv.sources]
-nano-agent = { git = "https://github.com/ASSERT-KTH/nano-agent", branch = "andre/fix/apptainer_sweb_env" }
