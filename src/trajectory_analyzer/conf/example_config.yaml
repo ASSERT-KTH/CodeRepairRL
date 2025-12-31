@@ -16,6 +16,7 @@ plots:
   - token_analysis             # Token usage analysis
   - error_patterns             # Top error messages (raw first 5 words)
   - failed_tool_calls          # Most common failing tool calls with arguments
+  - error_analysis             # Comprehensive error analysis (categories, rates, tools)
   # Multi-run plots (when 2+ runs):
   - comparison                 # Cross-run comparison grid
   - transfer_analysis          # Transfer learning impact (basic summary)

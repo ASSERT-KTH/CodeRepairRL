@@ -9,12 +9,16 @@ output_dir: "./plots"
 
 # Plots to generate
 # Options: tool_distribution, shell_command_distribution, success_rates, 
-#          token_analysis, comparison, transfer_analysis
+#          token_analysis, error_patterns, failed_tool_calls, error_analysis,
+#          comparison, transfer_analysis
 plots:
   - tool_distribution
   - shell_command_distribution
   - success_rates
   - token_analysis
+  - error_patterns
+  - failed_tool_calls
+  - error_analysis
   - comparison
   - transfer_analysis
 
@@ -22,6 +26,8 @@ plots:
 # Maps base model names to the scaffold they were trained on
 model_to_trained_scaffold:
   "agentica-org/DeepSWE-Preview": "r2e-gym"
+  "mistralai/devstral-2512:free": "mistral-vibe-cli"
+  "anthropic/claude-3-5-haiku-20241022": "claude-code"
 
 # Runs to analyze
 # Each run specifies:

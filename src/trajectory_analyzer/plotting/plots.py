@@ -54,6 +54,7 @@ class TrajectoryPlotter:
             'token_analysis',
             'error_patterns',
             'failed_tool_calls',
+            'error_analysis',            # comprehensive error analysis
             'comparison',
             'transfer_analysis',          # high-level transfer summary
             'transfer_mcnemar',           # instance-level transfer (McNemar)
@@ -95,6 +96,11 @@ class TrajectoryPlotter:
             
             if 'failed_tool_calls' in plots:
                 path = self.plot_failed_tool_calls(run)
+                if path:
+                    generated.append(path)
+            
+            if 'error_analysis' in plots:
+                path = self.plot_error_analysis(run)
                 if path:
                     generated.append(path)
         
@@ -271,13 +277,78 @@ class TrajectoryPlotter:
             logger.warning(f"No token data found for {run.name}")
             return None
         
-        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         fig.suptitle(f'Token Usage Analysis - {run.name}', fontsize=14, fontweight='bold')
         
-        # 1. Token usage by resolution status
+        # 1. Token usage by resolution status (stacked bar)
         resolved_trajs = run.get_resolved_trajectories()
         unresolved_trajs = run.get_unresolved_trajectories()
         
+        if resolved_trajs or unresolved_trajs:
+            # Calculate average token breakdowns
+            # Input tokens breakdown: cache_read (bottom), cache_creation (middle), regular input (top)
+            resolved_cache_read = np.mean([t.total_cache_read_input_tokens for t in resolved_trajs]) if resolved_trajs else 0
+            resolved_cache_creation = np.mean([t.total_cache_creation_input_tokens for t in resolved_trajs]) if resolved_trajs else 0
+            resolved_input = np.mean([t.total_input_tokens for t in resolved_trajs]) if resolved_trajs else 0
+            resolved_output = np.mean([t.total_output_tokens for t in resolved_trajs]) if resolved_trajs else 0
+            
+            unresolved_cache_read = np.mean([t.total_cache_read_input_tokens for t in unresolved_trajs]) if unresolved_trajs else 0
+            unresolved_cache_creation = np.mean([t.total_cache_creation_input_tokens for t in unresolved_trajs]) if unresolved_trajs else 0
+            unresolved_input = np.mean([t.total_input_tokens for t in unresolved_trajs]) if unresolved_trajs else 0
+            unresolved_output = np.mean([t.total_output_tokens for t in unresolved_trajs]) if unresolved_trajs else 0
+            
+            categories = []
+            cache_read_vals = []
+            cache_creation_vals = []
+            input_vals = []
+            output_vals = []
+            
+            if resolved_trajs:
+                categories.append(f'Resolved\n(n={len(resolved_trajs)})')
+                cache_read_vals.append(resolved_cache_read)
+                cache_creation_vals.append(resolved_cache_creation)
+                input_vals.append(resolved_input)
+                output_vals.append(resolved_output)
+            
+            if unresolved_trajs:
+                categories.append(f'Unresolved\n(n={len(unresolved_trajs)})')
+                cache_read_vals.append(unresolved_cache_read)
+                cache_creation_vals.append(unresolved_cache_creation)
+                input_vals.append(unresolved_input)
+                output_vals.append(unresolved_output)
+            
+            if categories:
+                x = np.arange(len(categories))
+                width = 0.6
+                
+                # Stack input tokens: cache_read (bottom), cache_creation (middle), regular input (top)
+                bottom = np.zeros(len(categories))
+                if any(cache_read_vals):
+                    axes[0, 0].bar(x, cache_read_vals, width, bottom=bottom, 
+                                  label='Cache Read Input Tokens', color='#9b59b6', alpha=0.7)
+                    bottom += np.array(cache_read_vals)
+                
+                if any(cache_creation_vals):
+                    axes[0, 0].bar(x, cache_creation_vals, width, bottom=bottom,
+                                  label='Cache Creation Input Tokens', color='#f39c12', alpha=0.7)
+                    bottom += np.array(cache_creation_vals)
+                
+                axes[0, 0].bar(x, input_vals, width, bottom=bottom, 
+                              label='Input Tokens (after cache)', color='#3498db', alpha=0.7)
+                bottom += np.array(input_vals)
+                
+                # Output tokens on top of all input
+                axes[0, 0].bar(x, output_vals, width, bottom=bottom,
+                              label='Output Tokens', color='#e74c3c', alpha=0.7)
+                
+                axes[0, 0].set_xticks(x)
+                axes[0, 0].set_xticklabels(categories)
+                axes[0, 0].set_ylabel('Average Token Usage')
+                axes[0, 0].set_title('Average Token Usage by Resolution Status')
+                axes[0, 0].legend(fontsize=8)
+                axes[0, 0].grid(axis='y', alpha=0.3)
+        
+        # 2. Token usage distribution (boxplot with total tokens)
         tokens_resolved = [t.total_tokens for t in resolved_trajs]
         tokens_unresolved = [t.total_tokens for t in unresolved_trajs]
         
@@ -291,31 +362,79 @@ class TrajectoryPlotter:
                 data.append(tokens_unresolved)
                 labels.append(f'Unresolved\n(n={len(tokens_unresolved)})')
             
-            bp = axes[0].boxplot(data, labels=labels, patch_artist=True)
+            bp = axes[0, 1].boxplot(data, labels=labels, patch_artist=True)
             if len(bp['boxes']) > 0:
                 bp['boxes'][0].set_facecolor('#2ecc71')
             if len(bp['boxes']) > 1:
                 bp['boxes'][1].set_facecolor('#e74c3c')
-            axes[0].set_ylabel('Token Usage')
-            axes[0].set_title('Token Usage by Resolution Status')
-            axes[0].grid(axis='y', alpha=0.3)
+            axes[0, 1].set_ylabel('Total Token Usage')
+            axes[0, 1].set_title('Token Usage Distribution by Resolution Status')
+            axes[0, 1].grid(axis='y', alpha=0.3)
         
-        # 2. Scatter: tokens vs tool usage
+        # 3. Scatter: tokens vs tool usage
         tokens = metrics.tokens_per_traj
         tool_calls = metrics.tool_calls_per_traj
         colors = ['#2ecc71' if t.resolved else '#e74c3c' for t in run.trajectories]
         
-        axes[1].scatter(tokens, tool_calls, c=colors, alpha=0.6, s=50)
-        axes[1].set_xlabel('Token Usage')
-        axes[1].set_ylabel('Tool Calls')
-        axes[1].set_title('Token Usage vs Tool Calls')
-        axes[1].grid(alpha=0.3)
+        axes[1, 0].scatter(tokens, tool_calls, c=colors, alpha=0.6, s=50)
+        axes[1, 0].set_xlabel('Token Usage')
+        axes[1, 0].set_ylabel('Tool Calls')
+        axes[1, 0].set_title('Token Usage vs Tool Calls')
+        axes[1, 0].grid(alpha=0.3)
         
         legend_elements = [
             Patch(facecolor='#2ecc71', label='Resolved'),
             Patch(facecolor='#e74c3c', label='Unresolved')
         ]
-        axes[1].legend(handles=legend_elements)
+        axes[1, 0].legend(handles=legend_elements)
+        
+        # 4. Token type breakdown (stacked bar for all trajectories)
+        all_cache_read = [t.total_cache_read_input_tokens for t in run.trajectories]
+        all_cache_creation = [t.total_cache_creation_input_tokens for t in run.trajectories]
+        all_input = [t.total_input_tokens for t in run.trajectories]
+        all_output = [t.total_output_tokens for t in run.trajectories]
+        
+        avg_cache_read = np.mean(all_cache_read) if all_cache_read else 0
+        avg_cache_creation = np.mean(all_cache_creation) if all_cache_creation else 0
+        avg_input = np.mean(all_input) if all_input else 0
+        avg_output = np.mean(all_output) if all_output else 0
+        
+        # Create a single stacked bar
+        x_pos = 0
+        width = 0.6
+        bottom = 0
+        
+        if avg_cache_read > 0:
+            axes[1, 1].bar(x_pos, avg_cache_read, width, bottom=bottom,
+                          label='Cache Read Input Tokens', color='#9b59b6', alpha=0.7)
+            bottom += avg_cache_read
+        
+        if avg_cache_creation > 0:
+            axes[1, 1].bar(x_pos, avg_cache_creation, width, bottom=bottom,
+                         label='Cache Creation Input Tokens', color='#f39c12', alpha=0.7)
+            bottom += avg_cache_creation
+        
+        if avg_input > 0:
+            axes[1, 1].bar(x_pos, avg_input, width, bottom=bottom,
+                          label='Input Tokens (after cache)', color='#3498db', alpha=0.7)
+            bottom += avg_input
+        
+        if avg_output > 0:
+            axes[1, 1].bar(x_pos, avg_output, width, bottom=bottom,
+                          label='Output Tokens', color='#e74c3c', alpha=0.7)
+            bottom += avg_output
+        
+        axes[1, 1].set_ylabel('Average Token Usage')
+        axes[1, 1].set_title('Average Token Type Breakdown')
+        axes[1, 1].set_xticks([])
+        axes[1, 1].legend(fontsize=8)
+        axes[1, 1].grid(axis='y', alpha=0.3)
+        
+        # Add total value label
+        total = bottom
+        if total > 0:
+            axes[1, 1].text(x_pos, total + max([avg_cache_read, avg_cache_creation, avg_input, avg_output]) * 0.02,
+                          f'Total: {int(total):,}', ha='center', va='bottom', fontsize=10, fontweight='bold')
         
         plt.tight_layout()
         output_path = self.output_dir / f'{self._safe_name(run.name)}_token_analysis.png'
@@ -485,6 +604,138 @@ class TrajectoryPlotter:
         logger.info(f"Saved failed tool calls plot to {output_path}")
         return output_path
     
+    def plot_error_analysis(self, run: Run) -> Path | None:
+        """Comprehensive error analysis showing main reasons for tool call errors.
+        
+        Args:
+            run: Run to analyze
+            
+        Returns:
+            Path to generated plot or None
+        """
+        from collections import defaultdict
+        
+        # Collect error data
+        error_categories: dict[str, int] = defaultdict(int)
+        tool_error_counts: dict[str, int] = defaultdict(int)
+        tool_total_counts: dict[str, int] = defaultdict(int)
+        error_samples: dict[str, list[tuple[str, str]]] = defaultdict(list)  # category -> [(tool, error_msg)]
+        tool_error_patterns: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        
+        for traj in run.trajectories:
+            for tc in traj.get_tool_calls():
+                tool_total_counts[tc.name] += 1
+                
+                if not tc.success and tc.result:
+                    # Categorize error
+                    category = extract_error_pattern(tc.result, mode="categorized")
+                    error_categories[category] += 1
+                    tool_error_counts[tc.name] += 1
+                    
+                    # Store sample errors (up to 3 per category)
+                    if len(error_samples[category]) < 3:
+                        error_preview = (tc.result or "")[:150]
+                        error_samples[category].append((tc.name, error_preview))
+                    
+                    # Track error patterns by tool
+                    pattern = extract_error_pattern(tc.result, mode="categorized")
+                    tool_error_patterns[tc.name][pattern] += 1
+        
+        if not error_categories:
+            logger.warning(f"No errors found for {run.name}")
+            return None
+        
+        # Calculate error rates
+        tool_error_rates = {
+            tool: tool_error_counts[tool] / tool_total_counts[tool]
+            for tool in tool_total_counts
+            if tool_total_counts[tool] > 0
+        }
+        
+        # Sort data
+        sorted_categories = sorted(error_categories.items(), key=lambda x: x[1], reverse=True)
+        sorted_tools_by_errors = sorted(tool_error_counts.items(), key=lambda x: x[1], reverse=True)
+        sorted_tools_by_rate = sorted(tool_error_rates.items(), key=lambda x: x[1], reverse=True)
+        
+        # Create figure with 2x2 subplots
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        fig.suptitle(f'Comprehensive Error Analysis - {run.name}', fontsize=16, fontweight='bold')
+        
+        # 1. Top error categories (pie chart + bar chart)
+        top_categories = sorted_categories[:10]
+        if top_categories:
+            categories, counts = zip(*top_categories)
+            
+            # Pie chart
+            colors = plt.cm.Set3(np.linspace(0, 1, len(categories)))
+            wedges, texts, autotexts = axes[0, 0].pie(
+                counts, labels=categories, autopct='%1.1f%%',
+                startangle=90, colors=colors, textprops={'fontsize': 8}
+            )
+            axes[0, 0].set_title('Error Categories Distribution', fontweight='bold')
+            
+            # Bar chart with counts
+            y_pos = np.arange(len(categories))
+            bars = axes[0, 1].barh(y_pos, counts, color=colors, alpha=0.7)
+            axes[0, 1].set_yticks(y_pos)
+            axes[0, 1].set_yticklabels([c.replace('_', ' ').title() for c in categories], fontsize=9)
+            axes[0, 1].invert_yaxis()
+            axes[0, 1].set_xlabel('Error Count')
+            axes[0, 1].set_title('Top Error Categories (Count)', fontweight='bold')
+            axes[0, 1].grid(axis='x', alpha=0.3)
+            
+            # Add count labels
+            for bar, count in zip(bars, counts):
+                axes[0, 1].text(bar.get_width() + max(counts)*0.01, bar.get_y() + bar.get_height()/2,
+                              str(count), va='center', fontsize=9)
+        
+        # 2. Error-prone tools (by count and rate)
+        top_tools_by_count = sorted_tools_by_errors[:10]
+        top_tools_by_rate = [t for t in sorted_tools_by_rate if t[1] > 0][:10]
+        
+        if top_tools_by_count:
+            tools, error_counts = zip(*top_tools_by_count)
+            x = np.arange(len(tools))
+            width = 0.35
+            
+            bars = axes[1, 0].bar(x, error_counts, width, color='#e74c3c', alpha=0.7, label='Error Count')
+            axes[1, 0].set_xticks(x)
+            axes[1, 0].set_xticklabels(tools, rotation=45, ha='right', fontsize=9)
+            axes[1, 0].set_ylabel('Error Count')
+            axes[1, 0].set_title('Most Error-Prone Tools (by Count)', fontweight='bold')
+            axes[1, 0].grid(axis='y', alpha=0.3)
+            
+            # Add count labels
+            for bar, count in zip(bars, error_counts):
+                axes[1, 0].text(bar.get_x() + bar.get_width()/2., bar.get_height(),
+                              str(count), ha='center', va='bottom', fontsize=8)
+        
+        if top_tools_by_rate:
+            tools_rate, rates = zip(*top_tools_by_rate)
+            x = np.arange(len(tools_rate))
+            
+            bars = axes[1, 1].barh(x, rates, color='#c0392b', alpha=0.7)
+            axes[1, 1].set_yticks(x)
+            axes[1, 1].set_yticklabels(tools_rate, fontsize=9)
+            axes[1, 1].invert_yaxis()
+            axes[1, 1].set_xlabel('Error Rate')
+            axes[1, 1].set_title('Tools with Highest Error Rates', fontweight='bold')
+            axes[1, 1].set_xlim(0, 1.1)
+            axes[1, 1].xaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0%}'))
+            axes[1, 1].grid(axis='x', alpha=0.3)
+            
+            # Add rate labels
+            for bar, rate in zip(bars, rates):
+                axes[1, 1].text(bar.get_width() + 0.02, bar.get_y() + bar.get_height()/2,
+                              f'{rate:.1%}', va='center', fontsize=9)
+        
+        plt.tight_layout()
+        output_path = self.output_dir / f'{self._safe_name(run.name)}_error_analysis.png'
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        logger.info(f"Saved error analysis plot to {output_path}")
+        return output_path
+    
     def plot_comparison(self, runs: list[Run]) -> Path | None:
         """Plot comparison across multiple runs."""
         if len(runs) < 2:
@@ -527,19 +778,60 @@ class TrajectoryPlotter:
             axes[0, 1].text(bar.get_x() + bar.get_width()/2., avg,
                           f'{avg:.1f}', ha='center', va='bottom')
         
-        # 3. Average tokens comparison
-        avg_tokens = [metrics_dict[name].avg_tokens for name in run_names]
+        # 3. Average tokens comparison (stacked by type)
+        # Calculate token breakdowns for each run
+        run_cache_read = []
+        run_cache_creation = []
+        run_input_tokens = []
+        run_output_tokens = []
         
-        bars = axes[1, 0].bar(range(len(run_names)), avg_tokens, color='purple', alpha=0.7)
+        for name in run_names:
+            run = next(r for r in runs if r.name == name)
+            cache_read_avg = np.mean([t.total_cache_read_input_tokens for t in run.trajectories]) if run.trajectories else 0
+            cache_creation_avg = np.mean([t.total_cache_creation_input_tokens for t in run.trajectories]) if run.trajectories else 0
+            input_avg = np.mean([t.total_input_tokens for t in run.trajectories]) if run.trajectories else 0
+            output_avg = np.mean([t.total_output_tokens for t in run.trajectories]) if run.trajectories else 0
+            
+            run_cache_read.append(cache_read_avg)
+            run_cache_creation.append(cache_creation_avg)
+            run_input_tokens.append(input_avg)
+            run_output_tokens.append(output_avg)
+        
+        x = np.arange(len(run_names))
+        width = 0.6
+        
+        # Stack input tokens: cache_read (bottom), cache_creation (middle), regular input (top)
+        bottom = np.zeros(len(run_names))
+        if any(run_cache_read):
+            axes[1, 0].bar(x, run_cache_read, width, bottom=bottom,
+                          label='Cache Read Input Tokens', color='#9b59b6', alpha=0.7)
+            bottom += np.array(run_cache_read)
+        
+        if any(run_cache_creation):
+            axes[1, 0].bar(x, run_cache_creation, width, bottom=bottom,
+                          label='Cache Creation Input Tokens', color='#f39c12', alpha=0.7)
+            bottom += np.array(run_cache_creation)
+        
+        axes[1, 0].bar(x, run_input_tokens, width, bottom=bottom,
+                      label='Input Tokens (after cache)', color='#3498db', alpha=0.7)
+        bottom += np.array(run_input_tokens)
+        
+        # Output tokens on top of all input
+        axes[1, 0].bar(x, run_output_tokens, width, bottom=bottom,
+                      label='Output Tokens', color='#e74c3c', alpha=0.7)
+        
         axes[1, 0].set_ylabel('Average Tokens')
-        axes[1, 0].set_title('Average Token Usage Comparison')
-        axes[1, 0].set_xticks(range(len(run_names)))
+        axes[1, 0].set_title('Average Token Usage Comparison (by Type)')
+        axes[1, 0].set_xticks(x)
         axes[1, 0].set_xticklabels(run_names, rotation=45, ha='right')
+        axes[1, 0].legend(fontsize=8)
         axes[1, 0].grid(axis='y', alpha=0.3)
         
-        for bar, avg in zip(bars, avg_tokens):
-            axes[1, 0].text(bar.get_x() + bar.get_width()/2., avg,
-                          f'{avg:.0f}', ha='center', va='bottom')
+        # Add total value labels on top of stacked bars
+        avg_tokens = [metrics_dict[name].avg_tokens for name in run_names]
+        for i, (x_pos, total) in enumerate(zip(x, avg_tokens)):
+            axes[1, 0].text(x_pos, total + max(avg_tokens) * 0.02,
+                          f'{total:.0f}', ha='center', va='bottom', fontsize=9)
         
         # 4. Scaffold comparison (group by scaffold)
         scaffold_metrics: dict[str, list[float]] = {}
@@ -585,6 +877,8 @@ class TrajectoryPlotter:
             # Default known mappings
             model_to_trained_scaffold = {
                 "agentica-org/DeepSWE-Preview": "r2e-gym",
+                "mistralai/devstral-2512:free": "mistral-vibe-cli",
+                "anthropic/claude-3-5-haiku-20241022": "claude-code",
             }
         
         analyses = self.comparator.find_transfer_pairs(runs, model_to_trained_scaffold)
@@ -650,6 +944,8 @@ class TrajectoryPlotter:
         if model_to_trained_scaffold is None:
             model_to_trained_scaffold = {
                 "agentica-org/DeepSWE-Preview": "r2e-gym",
+                "mistralai/devstral-2512:free": "mistral-vibe-cli",
+                "anthropic/claude-3-5-haiku-20241022": "claude-code",
             }
         
         from collections import defaultdict

@@ -45,7 +45,19 @@ class Step:
     """Tool calls made in this step."""
     
     token_usage: int = 0
-    """Tokens used in this step."""
+    """Tokens used in this step (total)."""
+    
+    input_tokens: int = 0
+    """Input tokens used in this step."""
+    
+    output_tokens: int = 0
+    """Output tokens used in this step."""
+    
+    cache_creation_input_tokens: int = 0
+    """Cache creation input tokens (for cached runs)."""
+    
+    cache_read_input_tokens: int = 0
+    """Cache read input tokens (tokens read from cache)."""
     
     @property
     def num_tool_calls(self) -> int:
@@ -81,6 +93,33 @@ class Trajectory:
     def total_tokens(self) -> int:
         """Total tokens used across all steps."""
         return sum(step.token_usage for step in self.steps)
+    
+    @property
+    def total_input_tokens(self) -> int:
+        """Total input tokens used across all steps."""
+        return sum(step.input_tokens for step in self.steps)
+    
+    @property
+    def total_output_tokens(self) -> int:
+        """Total output tokens used across all steps."""
+        return sum(step.output_tokens for step in self.steps)
+    
+    @property
+    def total_cache_creation_input_tokens(self) -> int:
+        """Total cache creation input tokens used across all steps."""
+        return sum(step.cache_creation_input_tokens for step in self.steps)
+    
+    @property
+    def total_cache_read_input_tokens(self) -> int:
+        """Total cache read input tokens used across all steps."""
+        return sum(step.cache_read_input_tokens for step in self.steps)
+    
+    @property
+    def total_input_tokens_all(self) -> int:
+        """Total input tokens including cache reads, cache creation, and regular input."""
+        return (self.total_cache_read_input_tokens + 
+                self.total_cache_creation_input_tokens + 
+                self.total_input_tokens)
     
     @property
     def total_tool_calls(self) -> int:

@@ -7,7 +7,7 @@ from typing import Any
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from .loaders import NanoAgentLoader, R2EGymLoader, SWEAgentLoader, TrajectoryLoader
+from .loaders import ClaudeCodeLoader, NanoAgentLoader, R2EGymLoader, SWEAgentLoader, TrajectoryLoader
 from .models import Run
 from .analysis import MetricsExtractor, RunComparator
 from .plotting import TrajectoryPlotter
@@ -19,12 +19,13 @@ def get_loader(format: str) -> TrajectoryLoader:
     """Get the appropriate loader for the format.
     
     Args:
-        format: One of 'nano_agent', 'r2e_gym', 'swe_agent'
+        format: One of 'claude_code', 'nano_agent', 'r2e_gym', 'swe_agent'
         
     Returns:
         TrajectoryLoader instance
     """
     loaders = {
+        'claude_code': ClaudeCodeLoader,
         'nano_agent': NanoAgentLoader,
         'r2e_gym': R2EGymLoader,
         'swe_agent': SWEAgentLoader,
