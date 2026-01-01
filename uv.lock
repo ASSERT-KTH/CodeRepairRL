@@ -536,7 +536,7 @@ requires-dist = [
     { name = "liger-kernel", git = "https://github.com/BjarniHaukur/liger-kernel.git" },
     { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.10.0" },
     { name = "mini-swe-agent", specifier = ">=1.17.0" },
-    { name = "nano-agent", specifier = ">=5.0.0" },
+    { name = "nano-agent", git = "https://github.com/ASSERT-KTH/nano-agent.git" },
     { name = "peft", specifier = ">=0.15.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.4" },
     { name = "scikit-learn", marker = "extra == 'dev'", specifier = ">=1.6.1" },
@@ -1866,14 +1866,10 @@ wheels = [
 
 [[package]]
 name = "nano-agent"
-version = "5.0.0"
-source = { registry = "https://pypi.org/simple" }
+version = "5.0.1"
+source = { git = "https://github.com/ASSERT-KTH/nano-agent.git#92419df28f39c9fa4d18f94e3cc229f904646896" }
 dependencies = [
     { name = "litellm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/89/7e/59724e5d301fbe6400bd6ce3283b59f11036cec57efc51e45a155c29a340/nano_agent-5.0.0.tar.gz", hash = "sha256:821cd88ef72e8bacf8be25fe3e146f0bfc1b1eb696b1692b8f149148942a1238", size = 33620, upload-time = "2025-12-02T20:28:36.578Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/95/05b2e1b0bcfb968d96db16bdf2e401d0dada2a92840d4f9e071b285c61ec/nano_agent-5.0.0-py3-none-any.whl", hash = "sha256:52fb379441dae9a818431c95b35879f9821458165ecbed328b1fcbf1a6f6a24d", size = 34745, upload-time = "2025-12-02T20:28:35.171Z" },
 ]
 
 [[package]]
