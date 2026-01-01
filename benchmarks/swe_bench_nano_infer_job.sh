@@ -3,28 +3,26 @@
 #SBATCH --output=logs/swe_nano_%A_%a.out
 #SBATCH --error=logs/swe_nano_%A_%a.err
 #SBATCH --nodes=1
-#SBATCH --gpus 1
-#SBATCH --time=00:30:00
+#SBATCH --gpus 8
+#SBATCH --time=12:00:00
 #SBATCH -C "fat"
-#SBATCH --array=0-9
+#SBATCH --array=0
 
 set -euo pipefail
-
-# Use common Apptainer runtime config (requires CRRL_WORKDIR in env)
-source scripts/appt_common.sh
 
 # Defaults
 BASE_MODEL="Qwen/Qwen3-8B"     # HF model to serve with vLLM
 LORA_PATH=""                    # Optional LoRA path; adapter name auto-derived from basename if set
 MODEL_NAME=""                   # Model name passed to the agent; auto-derived if empty
 SCAFFOLD="nano-agent"           # Scaffold identifier for run tagging
-OUTPUT_BASE_DIR="swe_bench/results"
+OUTPUT_BASE_DIR="swe_bench/"
 SUBSET="verified"
 SPLIT="test"
 SLICE=""
 PORT=8000
 SIF="benchmarks/benchmark_container.sif"
 START_SERVER=1
+WANDB_API_KEY=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -55,7 +53,7 @@ done
 
 # Derive slice and per-task settings when running as a SLURM array
 TASK_ID=${SLURM_ARRAY_TASK_ID:-0}
-SHARD_SIZE=50
+SHARD_SIZE=500
 
 # Auto-compute slice if not explicitly provided
 if [[ -z "$SLICE" ]]; then
@@ -117,7 +115,7 @@ wait_for_vllm() {
   while (( tries-- > 0 )); do
     code=$(curl -s -o /dev/null -w "%{http_code}" "$url/models" || true)
     if [[ "$code" == "200" ]]; then return 0; fi
-    sleep 2
+    sleep 10
   done
   return 1
 }
@@ -133,12 +131,17 @@ case "${BASE_MODEL,,}" in
 esac
 
 VLLM_PID=""
+export MAX_CONTEXT_LEN=65536
+export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
 if [[ $START_SERVER -eq 1 ]]; then
   echo "Starting vLLM server on port $PORT for base model '$BASE_MODEL'..."
-  CMD=(apptainer exec $APPT_COMMON --env CUDA_VISIBLE_DEVICES=0 "$SIF" vllm serve "$BASE_MODEL" \
+  CMD=(uv run vllm serve $BASE_MODEL \
     --port "$PORT" \
     --enable-auto-tool-choice \
-    --max-model-len 16384 \
+    --tensor-parallel-size 8 \
+    --max-model-len $MAX_CONTEXT_LEN \
+    --hf-overrides '{"max_position_embeddings": '$MAX_CONTEXT_LEN'}' \
+    --enable_prefix_caching \
     $CT \
     $RP $TP)
 
@@ -147,7 +150,7 @@ if [[ $START_SERVER -eq 1 ]]; then
   fi
 
   # Start server in background and capture PID
-  "${CMD[@]}" > "logs/vllm_${SLURM_JOB_ID:-$$}.log" 2>&1 &
+  (exec "${CMD[@]}") > "logs/vllm_${SLURM_JOB_ID:-$$}.log" 2>&1 &
   VLLM_PID=$!
   trap 'if [[ -n "$VLLM_PID" ]]; then kill "$VLLM_PID" 2>/dev/null || true; fi' EXIT
 
@@ -159,16 +162,16 @@ if [[ $START_SERVER -eq 1 ]]; then
 fi
 
 echo "Running nano_agent evaluation with model '$MODEL_NAME'..."
-apptainer exec $APPT_COMMON \
-  --env OPENAI_API_BASE="$ENDPOINT" \
-  --env OPENAI_API_KEY="dummy" \
-  "$SIF" python3 benchmarks/swe_bench/run_nano_eval.py \
-    --endpoint "$ENDPOINT" \
-    --model-name "hosted_vllm/$MODEL_NAME" \
-    --output-dir "$OUTPUT_DIR" \
-    --subset "$SUBSET" \
-    --split "$SPLIT" \
-    --slice "$SLICE"
+OPENAI_API_BASE="$ENDPOINT" \
+OPENAI_API_KEY="dummy" \
+uv run python benchmarks/swe_bench/run_nano_eval.py \
+  --endpoint "$ENDPOINT" \
+  --model-name "hosted_vllm/$MODEL_NAME" \
+  --output-dir "$OUTPUT_DIR" \
+  --subset "$SUBSET" \
+  --split "$SPLIT" \
+  --slice "$SLICE" \
+  --backend "apptainer"
 
 echo "Predictions saved to $OUTPUT_DIR/preds.jsonl"
 

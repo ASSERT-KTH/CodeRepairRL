@@ -6,11 +6,70 @@ from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor
 
 from nano import Agent
+from nano.env import Environment, ApptainerEnvironment
 
 from src.utils.git import handle_to_url, clone_repo_at_commit, clean_repo_dir
 
 logger = logging.getLogger(__name__)
 
+
+def setup_env_swebench(env: Environment):
+    """
+    Mimics the R2E-Gym setup function with both swebench and non-swebench paths.
+    Detects which type of image we're using and applies the appropriate setup.
+    """
+    repo_path = "/testbed"
+    alt_path = "/root"
+    
+    # Set the PATH for all subsequent commands
+    DOCKER_PATH = "/root/.venv/bin:/root/.local/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    env.path = DOCKER_PATH
+    
+    # === setup_env_swebench path ===
+    # Make run_tests.sh executable (if present)
+    # We will not use this script in nano-agent
+    # env.run_shell("chmod +x /run_tests.sh 2>/dev/null || true")
+    
+    # Create symlink of conda env to /root/.venv
+    env.run_shell("ln -sf /opt/miniconda3/envs/testbed /root/.venv")
+    
+    # Install required packages
+    env.run_shell("python -m pip install chardet -q")
+    
+    # === setup_env (non-swebench R2E-Gym) path ===
+    # Create local bin directory if needed
+    env.run_shell(f"mkdir -p {alt_path}/.local/bin")
+    
+    # Symlink python executables
+    env.run_shell(f"ln -sf {repo_path}/.venv/bin/python {alt_path}/.local/bin/python")
+    env.run_shell(f"ln -sf {repo_path}/.venv/bin/python {alt_path}/.local/bin/python3")
+    
+    # Symlink all executables from venv bin
+    env.run_shell(f"find {repo_path}/.venv/bin -type f -executable -exec ln -sf {{}} {alt_path}/.local/bin/ \\;")
+    
+    # Clean up pycache files
+    env.run_shell("find . -name '*.pyc' -delete 2>/dev/null || true")
+    env.run_shell("find . -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true")
+    
+    # Clean up pycache from r2e_tests (if present)
+    env.run_shell("find /r2e_tests -name '*.pyc' -delete 2>/dev/null || true")
+    env.run_shell("find /r2e_tests -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true")
+    
+    # Move r2e_tests to /root (if present)
+    # We will not use this script in nano-agent
+    # env.run_shell(f"mv /r2e_tests {alt_path}/r2e_tests 2>/dev/null || true")
+    
+    # Create symlink for r2e_tests in repo
+    # We will not use this script in nano-agent
+    # env.run_shell(f"ln -sf {alt_path}/r2e_tests {repo_path}/r2e_tests 2>/dev/null || true")
+    
+    # Install ripgrep
+    env.run_shell("apt-get update && apt-get install -y ripgrep 2>/dev/null || true")
+
+    # Commit all changes to ensure we have a clean state
+    env.run_shell("git config --global user.email 'you@example.com'")
+    env.run_shell("git config --global user.name 'Your Name'")
+    env.run_shell("git add . && git commit -m 'add changes'")
 
 @dataclass
 class NanoConfig:
@@ -27,6 +86,8 @@ class NanoConfig:
     top_k: Optional[int] = None
     verbose: bool = False
     log: bool = False
+    backend: str = "local"
+    env: Optional[Any] = None
 
 
 def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
@@ -37,36 +98,61 @@ def _process_one(data: dict[str, Any], config: NanoConfig) -> dict[str, Any]:
 
     agent_kwargs = asdict(config)
     agent_kwargs.pop("agent_kind", None)
+    
+    # Handle backend and environment setup
+    backend = agent_kwargs.pop("backend", "local")
+    env = agent_kwargs.pop("env", None)
+
+    # Initialize agent with appropriate environment
+    if backend == "apptainer" and env is None:
+        # If using Apptainer backend but env not provided in config, we need to construct it
+        # This logic might belong better in the caller, but we can handle it here or
+        # expect the caller to pass the fully constructed environment in `config.env`.
+        # Based on the reference, the caller (run_nano_eval) should likely construct the environment.
+        # However, `_process_one` is called per instance, and the environment depends on the instance ID.
+        instance_id = data.get("instance_id")
+        image_name = f"docker.io/slimshetty/swebench-verified:sweb.eval.x86_64.{instance_id}"
+        workdir = "/testbed"
+        env = ApptainerEnvironment(image=f"docker://{image_name}", workdir=workdir, setup_fn=setup_env_swebench)
+        agent_kwargs["env"] = env
+    elif env:
+        agent_kwargs["env"] = env
+
     agent = Agent(**agent_kwargs)
 
     diff = ""
     temp_folder = None
-    try:
-        repo_url = handle_to_url(data["repo"])
-        temp_folder = clone_repo_at_commit(repo_url, data["base_commit"])
-    except Exception as e:
-        agent._reset()
-        agent._append({"role": "user", "content": data["problem_statement"]})
-        agent._append({"role": "assistant", "content": ""})  # this should be incredibly rare, only encountered this once in 20+ runs
-        logger.error(f"Error with git in _process_one: {type(e).__name__}: {e}")
-        if temp_folder: clean_repo_dir(temp_folder)
-        return dict(
-            prompt=agent.messages[:2],
-            completion=agent.messages[2:],
-            tools=agent.tools,
-            generated_diff="",
-            token_usage=agent.token_usage,
-            tool_usage=agent.tool_usage,
-            **agent.tool_stats
-        )
-        
+    
+    if backend == "local":
+        try:
+            repo_url = handle_to_url(data["repo"])
+            temp_folder = clone_repo_at_commit(repo_url, data["base_commit"])
+        except Exception as e:
+            agent._reset()
+            agent._append({"role": "user", "content": data["problem_statement"]})
+            agent._append({"role": "assistant", "content": ""})
+            logger.error(f"Error with git in _process_one: {type(e).__name__}: {e}")
+            if temp_folder: clean_repo_dir(temp_folder)
+            return dict(
+                prompt=agent.messages[:2],
+                completion=agent.messages[2:],
+                tools=agent.tools,
+                generated_diff="",
+                token_usage=agent.token_usage,
+                tool_usage=agent.tool_usage,
+                **agent.tool_stats
+            )
+    else:
+        # For container backends, the repo is already in the container image at workdir
+        temp_folder = "/testbed" # default workdir for SWE-bench containers
+
     try:
         diff = agent.run(task=data["problem_statement"], repo_root=temp_folder)
     except Exception as e:
         logger.error(f"Error in _process_one: {type(e).__name__}: {e}")
         diff = ""
     finally:
-        if temp_folder: clean_repo_dir(temp_folder)
+        if backend == "local" and temp_folder: clean_repo_dir(temp_folder)
 
         token_usage = agent.token_usage
         tool_usage = agent.tool_usage

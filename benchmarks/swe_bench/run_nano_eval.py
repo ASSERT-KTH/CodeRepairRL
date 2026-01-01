@@ -19,7 +19,7 @@ from src.agents.nano_agent import _process_one, NanoConfig
 from datasets import load_dataset
 
 
-def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slice_spec: str, output_dir: Path):
+def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slice_spec: str, output_dir: Path, backend: str = "local"):
     """Run nano_agent on SWE-bench tasks and save predictions using a process pool."""
 
     # Load SWE-bench dataset
@@ -49,10 +49,11 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
     config = NanoConfig(
         api_base=endpoint,
         model=model_name,  # e.g., "nano" for LoRA
-        token_limit=16384,
-        time_limit=40,
-        tool_limit=30,
-        temperature=0.2,
+        token_limit=65536,
+        time_limit=600,
+        tool_limit=500,
+        temperature=1.0,
+        backend=backend,
     )
 
     # Prepare inputs for workers
@@ -70,7 +71,7 @@ def run_evaluation(endpoint: str, model_name: str, subset: str, split: str, slic
     detailed_predictions: dict[str, dict] = {}
 
     # Run with a process pool of up to 8 workers
-    max_workers = min(8, len(inputs)) if inputs else 0
+    max_workers = min(48, len(inputs)) if inputs else 0
     if max_workers == 0:
         print("No instances to process.")
         return
@@ -156,11 +157,13 @@ def main():
                         help="Dataset split")
     parser.add_argument("--slice", default=":25",
                         help="Slice to run. Forms: :N (first N) or start:end (half-open)")
+    parser.add_argument("--backend", choices=["local", "apptainer"], default="local",
+                        help="Execution backend (local or apptainer)")
     
     args = parser.parse_args()
     
     output_dir = Path(args.output_dir)
-    run_evaluation(args.endpoint, args.model_name, args.subset, args.split, args.slice, output_dir)
+    run_evaluation(args.endpoint, args.model_name, args.subset, args.split, args.slice, output_dir, args.backend)
 
 
 if __name__ == "__main__":

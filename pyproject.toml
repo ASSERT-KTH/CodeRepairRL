@@ -9,22 +9,22 @@ dependencies = [
     "trl @ git+https://github.com/ASSERT-KTH/trl.git@dev",
     # The agent we use for rollout generation,
     "nano-agent @ git+https://github.com/ASSERT-KTH/nano-agent.git",
-    "mini-swe-agent>=1.13.0",
+    "mini-swe-agent>=1.17.0",
     # Optimized loss kernels, forked to support GSPO
     "liger-kernel @ git+https://github.com/BjarniHaukur/liger-kernel.git",
     # Other HF stuff
     "accelerate>=1.8.0",
     "transformers",
     "huggingface-hub",
-    "datasets>=3.3.0",
+    "datasets>=4.4.1",
     "peft>=0.15.0",
     "bitsandbytes>=0.44.1; platform_system != 'Darwin'",
     # Logging
-    "wandb>=0.19.6",
+    "wandb>=0.23.0",
     # Config
     "hydra-core>=1.3.2",
     # Needed for SWE-Gym, to clone the repos
-    "gitpython>=3.1.44",
+    "gitpython>=3.1.45",
     # Is required BEFORE the package manager considers vLLM flash-attn
     "setuptools>=75.8.0",
     # efficient training of LLMs

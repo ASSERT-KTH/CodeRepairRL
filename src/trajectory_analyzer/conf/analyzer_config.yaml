@@ -1,0 +1,72 @@
+# Trajectory Analyzer Configuration
+# 
+# Usage:
+#   uv run python -m src.trajectory_analyzer --config-path conf --config-name analyzer_config
+#   uv run python -m src.trajectory_analyzer output_dir=./my_plots 'plots=[tool_distribution,comparison]'
+
+# Output settings
+output_dir: "./plots"
+
+# Plots to generate
+# Options: tool_distribution, shell_command_distribution, success_rates, 
+#          token_analysis, error_patterns, failed_tool_calls, error_analysis,
+#          comparison, transfer_analysis
+plots:
+  - tool_distribution
+  - shell_command_distribution
+  - success_rates
+  - token_analysis
+  - error_patterns
+  - failed_tool_calls
+  - error_analysis
+  - comparison
+  - transfer_analysis
+
+# Model to trained scaffold mapping (for transfer analysis)
+# Maps base model names to the scaffold they were trained on
+model_to_trained_scaffold:
+  "agentica-org/DeepSWE-Preview": "r2e-gym"
+  "mistralai/devstral-2512:free": "mistral-vibe-cli"
+  "anthropic/claude-3-5-haiku-20241022": "claude-code"
+
+# Runs to analyze
+# Each run specifies:
+#   - name: Identifier for the run
+#   - format: nano_agent | r2e_gym | swe_agent
+#   - trajectories: Path to trajectory file(s) (supports glob patterns for r2e_gym)
+#   - results: Optional path to SWE-bench results JSON
+#   - base_model: Base model identifier
+#   - scaffold: Agent scaffold type
+#   - lora_adapter: Optional LoRA adapter name
+runs: []
+
+# Example runs configuration (uncomment and modify as needed):
+# runs:
+#   - name: "deepswe-nano-agent"
+#     format: "nano_agent"
+#     trajectories: "/path/to/detailed_predictions.jsonl"
+#     results: "/path/to/results.json"
+#     base_model: "agentica-org/DeepSWE-Preview"
+#     scaffold: "nano-agent"
+#     lora_adapter: null
+#   
+#   - name: "deepswe-r2e-gym"
+#     format: "r2e_gym"
+#     trajectories: "/path/to/deepswe_32b_agent_*.jsonl"
+#     results: null
+#     base_model: "agentica-org/DeepSWE-Preview"
+#     scaffold: "r2e-gym"
+#     lora_adapter: null
+#
+#   - name: "qwen-nano-agent-finetuned"
+#     format: "nano_agent"
+#     trajectories: "/path/to/detailed_predictions.jsonl"
+#     results: "/path/to/results.json"
+#     base_model: "Qwen/Qwen3-32B"
+#     scaffold: "nano-agent"
+#     lora_adapter: "GSPO-Final-lora-step-460"
+
+hydra:
+  job:
+    chdir: false
+
