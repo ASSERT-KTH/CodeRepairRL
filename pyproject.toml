@@ -36,6 +36,7 @@ dependencies = [
     # when python >= 3.12, wandb crashes on importlib-metadata when any .dist-info folder has a missing Name: field
     "wandb>=0.18.4",
     "swebench>=4.1.0",
+    "matplotlib>=3.10.8"
 ]
 
 [project.optional-dependencies]
@@ -46,7 +47,7 @@ flash = [
     "flash-attn==2.8.3; platform_system != 'Darwin'",
     "flashinfer-python==0.5.0; platform_system != 'Darwin'",
 ]
-dev = ["pytest>=8.3.4", "matplotlib>=3.10.0", "scikit-learn>=1.6.1"]
+dev = ["pytest>=8.3.4", "scikit-learn>=1.6.1"]
 # Different agents
 # aider = ["aider-chat @ git+https://github.com/BjarniHaukur/aider.git"]
 # sweagent = ["sweagent @ git+https://github.com/BjarniHaukur/SWE-agent.git"]
