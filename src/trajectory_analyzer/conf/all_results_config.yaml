@@ -1,0 +1,179 @@
+# All Results Trajectory Analyzer Configuration
+# 
+# This configuration loads all available results from CodeRepairRL-results.
+# Includes both nano-agent and R2E-Gym scaffold runs.
+#
+# Usage:
+#   uv run python -m src.trajectory_analyzer --config-path conf --config-name all_results_config
+
+output_dir: "./plots/all_results_analysis"
+
+plots:
+  # Per-run plots (generated for each run):
+  - tool_distribution          # Bar chart of tool usage counts
+  - shell_command_distribution # Bar chart of shell commands (grep, cat, etc.)
+  - success_rates              # Resolution rates, tool success rates
+  - token_analysis             # Token usage analysis
+  - error_patterns             # Top error messages (raw first 5 words)
+  - failed_tool_calls          # Most common failing tool calls with arguments
+  - error_analysis             # Comprehensive error analysis (categories, rates, tools)
+  # Multi-run plots (when 2+ runs):
+  - comparison                 # Cross-run comparison grid
+  - transfer_analysis          # Transfer learning impact (basic summary)
+  - transfer_mcnemar           # Instance-level transfer (McNemar contingency + stats)
+  - transfer_error_modes       # Error mode comparison between scaffolds
+  - transfer_vocabulary        # Tool vocabulary alignment and hallucinations
+  - transfer_error_patterns    # Raw error message pattern changes
+
+# Model to trained scaffold mapping
+model_to_trained_scaffold:
+  "agentica-org/DeepSWE-Preview": "r2e-gym"
+  "ASSERT-KTH/Qwen3-32B-Nano-SWE-Gym-SFT-Lora": "nano-agent"
+  "Qwen/Qwen3-32B": null  # Base model, not trained on specific scaffold
+  "Qwen/Qwen3-14B": null
+  "Qwen/Qwen3-8B": null
+
+runs:
+  # ===== NANO-AGENT SCAFFOLD RUNS =====
+  
+  # DeepSWE on nano-agent scaffold
+  - name: "deepswe-nano-agent"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-agentica-org_DeepSWE-Preview/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-agentica-org_DeepSWE-Preview/nano-agent-hosted_vllm__agentica-org__DeepSWE-Preview.deepswe_32b__nano__500_tool_cals.json"
+    base_model: "agentica-org/DeepSWE-Preview"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  # Qwen3-32B SFT LoRA on nano-agent scaffold
+  - name: "qwen32b-sftlora-nano-agent"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-ASSERT-KTH_Qwen3-32B-Nano-SWE-Gym-SFT-Lora/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-ASSERT-KTH_Qwen3-32B-Nano-SWE-Gym-SFT-Lora/nano-agent-hosted_vllm__ASSERT-KTH__Qwen3-32B-Nano-SWE-Gym-SFT-Lora.nanosftlora_32b__nano.json"
+    base_model: "ASSERT-KTH/Qwen3-32B-Nano-SWE-Gym-SFT-Lora"
+    scaffold: "nano-agent"
+    lora_adapter: "Qwen3-32B-Nano-SWE-Gym-SFT-Lora"
+
+  # Qwen3-32B base on nano-agent scaffold
+  - name: "qwen32b-nano-agent"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/nano-agent-hosted_vllm__Qwen__Qwen3-32B.qwen_32b__nano__500_tool_calls.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  # Qwen3-14B base on nano-agent scaffold
+  - name: "qwen14b-nano-agent"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-14B/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-14B/nano-agent-hosted_vllm__Qwen__Qwen3-14B.qwen_14b__nano.json"
+    base_model: "Qwen/Qwen3-14B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  # Qwen3-8B base on nano-agent scaffold
+  - name: "qwen8b-nano-agent"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-8B/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-8B/nano-agent-hosted_vllm__Qwen__Qwen3-8B.qwen_8b__nano.json"
+    base_model: "Qwen/Qwen3-8B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  # ===== R2E-GYM SCAFFOLD RUNS =====
+  
+  # DeepSWE on R2E-Gym scaffold (its training scaffold) - temp 1.0 run 1
+  - name: "deepswe-r2e-gym-temp1-run1"
+    format: "r2e_gym"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/traj_deepswe32b/deepswe_32b_agent_swebv_eval_temp_1_run_1.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/traj_deepswe32b/deepswe_32b_agent_swebv_eval_temp_1_run_1.deepswe_32b__r2egym.json"
+    base_model: "agentica-org/DeepSWE-Preview"
+    scaffold: "r2e-gym"
+    lora_adapter: null
+
+  # DeepSWE on R2E-Gym scaffold - temp 1.0 run 2
+  - name: "deepswe-r2e-gym-temp1-run2"
+    format: "r2e_gym"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/traj_deepswe32b/deepswe_32b_agent_swebv_eval_temp_1_run_2.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/traj_deepswe32b/deepswe_32b_agent_swebv_eval_temp_1_run_2.deepswe_32b__r2egym__run2.json"
+    base_model: "agentica-org/DeepSWE-Preview"
+    scaffold: "r2e-gym"
+    lora_adapter: null
+
+  # DeepSWE on R2E-Gym scaffold - temp 1.0 run 3
+  - name: "deepswe-r2e-gym-temp1-run3"
+    format: "r2e_gym"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/traj_deepswe32b/deepswe_32b_agent_swebv_eval_temp_1_run_3.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/traj_deepswe32b/deepswe_32b_agent_swebv_eval_temp_1_run_3.deepswe_32b__r2egym__run3.json"
+    base_model: "agentica-org/DeepSWE-Preview"
+    scaffold: "r2e-gym"
+    lora_adapter: null
+
+  # DeepSWE on R2E-Gym scaffold - temp 0.2 run 1
+  - name: "deepswe-r2e-gym-temp0.2-run1"
+    format: "r2e_gym"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/traj_deepswe32b/deepswe_32b_agent_swebv_eval_temp_0.2_run_1.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/traj_deepswe32b/deepswe_32b_agent_swebv_eval_temp_0.2_run_1.deepswe_32b__r2egym__temp_0.2_run_1.json"
+    base_model: "agentica-org/DeepSWE-Preview"
+    scaffold: "r2e-gym"
+    lora_adapter: null
+
+  # Qwen3-32B SFT LoRA on R2E-Gym scaffold
+  - name: "qwen32b-sftlora-r2e-gym"
+    format: "r2e_gym"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/traj_nanosftlora32b/nanosftlora_32b_agent_swebv_eval_temp_1_run_1.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/traj_nanosftlora32b/nanosftlora_32b_agent_swebv_eval_temp_1_run_1.nanosftlora_32b__r2egym__run_1.json"
+    base_model: "ASSERT-KTH/Qwen3-32B-Nano-SWE-Gym-SFT-Lora"
+    scaffold: "r2e-gym"
+    lora_adapter: "Qwen3-32B-Nano-SWE-Gym-SFT-Lora"
+
+  # Qwen3-32B base on R2E-Gym scaffold - temp 1.0 run 1
+  - name: "qwen32b-r2e-gym-temp1-run1"
+    format: "r2e_gym"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/traj_qwen32b/qwen3_32b_agent_swebv_eval_temp_1_run_1.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/traj_qwen32b/qwen3_32b_agent_swebv_eval_temp_1_run_1.qwen_32b__r2egym.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "r2e-gym"
+    lora_adapter: null
+
+  # Qwen3-32B base on R2E-Gym scaffold - temp 1.0 run 2
+  - name: "qwen32b-r2e-gym-temp1-run2"
+    format: "r2e_gym"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/traj_qwen32b/qwen3_32b_agent_swebv_eval_temp_1_run_2.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/traj_qwen32b/qwen3_32b_agent_swebv_eval_temp_1_run_2.qwen_32b__r2egym__run2.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "r2e-gym"
+    lora_adapter: null
+
+  # Qwen3-32B base on R2E-Gym scaffold - temp 1.0 run 3
+  - name: "qwen32b-r2e-gym-temp1-run3"
+    format: "r2e_gym"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/traj_qwen32b/qwen3_32b_agent_swebv_eval_temp_1_run_3.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/traj_qwen32b/qwen3_32b_agent_swebv_eval_temp_1_run_3.qwen_32b__r2egym__run3.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "r2e-gym"
+    lora_adapter: null
+
+  # Qwen3-32B base on R2E-Gym scaffold - temp 0.2 run 1
+  - name: "qwen32b-r2e-gym-temp0.2-run1"
+    format: "r2e_gym"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/traj_qwen32b/qwen3_32b_agent_swebv_eval_temp_0.2_run_1.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/traj_qwen32b/qwen3_32b_agent_swebv_eval_temp_0.2_run_1.qwen_32b__r2egym__temp_0.2_run_1.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "r2e-gym"
+    lora_adapter: null
+
+  # Qwen3-8B base on R2E-Gym scaffold
+  - name: "qwen8b-r2e-gym"
+    format: "r2e_gym"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/traj_qwen8b/qwen_8b_agent_swebv_eval_temp_1_run_1.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/traj_qwen8b/qwen_8b_agent_swebv_eval_temp_1_run_1.qwen_8b__r2egym__run_1.json"
+    base_model: "Qwen/Qwen3-8B"
+    scaffold: "r2e-gym"
+    lora_adapter: null
+
+hydra:
+  job:
+    chdir: false
+

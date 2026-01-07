@@ -745,7 +745,13 @@ class TrajectoryPlotter:
         metrics_dict = self.comparator.compare_runs(runs)
         run_names = list(metrics_dict.keys())
         
-        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        # Adjust figure size based on number of runs to prevent layout issues
+        num_runs = len(run_names)
+        # Base width and height, increase width for more runs
+        fig_width = min(20, 12 + num_runs * 0.5)  # Cap at 20 inches
+        fig_height = 14  # Fixed height to prevent excessive expansion
+        
+        fig, axes = plt.subplots(2, 2, figsize=(fig_width, fig_height))
         fig.suptitle('Comparison Across Runs', fontsize=16, fontweight='bold')
         
         # 1. Resolution rate comparison
@@ -757,7 +763,13 @@ class TrajectoryPlotter:
         axes[0, 0].set_ylim(0, 1.1)
         axes[0, 0].yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0%}'))
         axes[0, 0].set_xticks(range(len(run_names)))
-        axes[0, 0].set_xticklabels(run_names, rotation=45, ha='right')
+        # Truncate long names and adjust rotation based on number of runs
+        if num_runs > 10:
+            # For many runs, use 90 degree rotation and truncate names
+            truncated_names = [name[:20] + '...' if len(name) > 20 else name for name in run_names]
+            axes[0, 0].set_xticklabels(truncated_names, rotation=90, ha='right', fontsize=8)
+        else:
+            axes[0, 0].set_xticklabels(run_names, rotation=45, ha='right')
         axes[0, 0].grid(axis='y', alpha=0.3)
         
         for i, (bar, rate) in enumerate(zip(bars, resolve_rates)):
@@ -771,7 +783,11 @@ class TrajectoryPlotter:
         axes[0, 1].set_ylabel('Average Tool Calls')
         axes[0, 1].set_title('Average Tool Usage Comparison')
         axes[0, 1].set_xticks(range(len(run_names)))
-        axes[0, 1].set_xticklabels(run_names, rotation=45, ha='right')
+        if num_runs > 10:
+            truncated_names = [name[:20] + '...' if len(name) > 20 else name for name in run_names]
+            axes[0, 1].set_xticklabels(truncated_names, rotation=90, ha='right', fontsize=8)
+        else:
+            axes[0, 1].set_xticklabels(run_names, rotation=45, ha='right')
         axes[0, 1].grid(axis='y', alpha=0.3)
         
         for bar, avg in zip(bars, avg_tool_calls):
@@ -823,7 +839,11 @@ class TrajectoryPlotter:
         axes[1, 0].set_ylabel('Average Tokens')
         axes[1, 0].set_title('Average Token Usage Comparison (by Type)')
         axes[1, 0].set_xticks(x)
-        axes[1, 0].set_xticklabels(run_names, rotation=45, ha='right')
+        if num_runs > 10:
+            truncated_names = [name[:20] + '...' if len(name) > 20 else name for name in run_names]
+            axes[1, 0].set_xticklabels(truncated_names, rotation=90, ha='right', fontsize=8)
+        else:
+            axes[1, 0].set_xticklabels(run_names, rotation=45, ha='right')
         axes[1, 0].legend(fontsize=8)
         axes[1, 0].grid(axis='y', alpha=0.3)
         
@@ -855,9 +875,17 @@ class TrajectoryPlotter:
             axes[1, 1].text(bar.get_x() + bar.get_width()/2., avg,
                           f'{avg:.1%}', ha='center', va='bottom')
         
-        plt.tight_layout()
+        # Use constrained_layout instead of tight_layout for better handling of many runs
+        plt.tight_layout(pad=2.0, h_pad=2.0, w_pad=2.0)
         output_path = self.output_dir / 'comparison_across_runs.png'
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        # Use bbox_inches='tight' but with a reasonable DPI to prevent excessive size
+        # If still too large, fall back to regular bbox
+        try:
+            plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
+        except (ValueError, OverflowError):
+            # Fallback: save without tight bbox if size is still too large
+            logger.warning("Figure too large for tight bbox, saving with regular bbox")
+            plt.savefig(output_path, dpi=150, facecolor='white')
         plt.close()
         logger.info(f"Saved comparison plot to {output_path}")
         return output_path

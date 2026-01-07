@@ -1,6 +1,8 @@
 """Hydra CLI entry point for trajectory analyzer."""
 
 import logging
+import statistics
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -96,6 +98,105 @@ def print_summary(runs: list[Run], comparator: RunComparator) -> None:
     print()
 
 
+def generate_swebench_score_table(runs: list[Run], output_dir: Path) -> Path:
+    """Generate a markdown table with models as rows, scaffolds as columns, and SWE-bench scores.
+    
+    For runs with multiple entries (same model+scaffold), compute mean ± stddev.
+    
+    Args:
+        runs: List of runs to analyze
+        output_dir: Directory to save the markdown file
+        
+    Returns:
+        Path to the generated markdown file
+    """
+    # Group runs by (base_model, scaffold)
+    grouped: dict[tuple[str, str], list[Run]] = defaultdict(list)
+    for run in runs:
+        key = (run.base_model, run.scaffold)
+        grouped[key].append(run)
+    
+    # Collect all unique models and scaffolds
+    all_models = sorted(set(run.base_model for run in runs))
+    all_scaffolds = sorted(set(run.scaffold for run in runs))
+    
+    # Build the table data
+    table_data: dict[str, dict[str, str]] = {}
+    
+    for model in all_models:
+        table_data[model] = {}
+        for scaffold in all_scaffolds:
+            key = (model, scaffold)
+            matching_runs = grouped.get(key, [])
+            
+            if not matching_runs:
+                table_data[model][scaffold] = "-"
+            elif len(matching_runs) == 1:
+                # Single run: just show the score
+                score = matching_runs[0].resolve_rate
+                table_data[model][scaffold] = f"{score:.1%}"
+            else:
+                # Multiple runs: compute mean ± stddev
+                scores = [run.resolve_rate for run in matching_runs]
+                mean_score = statistics.mean(scores)
+                if len(scores) > 1:
+                    stddev_score = statistics.stdev(scores)
+                    table_data[model][scaffold] = f"{mean_score:.1%} ± {stddev_score:.1%}"
+                else:
+                    table_data[model][scaffold] = f"{mean_score:.1%}"
+    
+    # Generate markdown table
+    lines = ["# SWE-bench Scores by Model and Scaffold\n"]
+    lines.append("This table shows the resolution rate (SWE-bench score) for each model-scaffold combination.\n")
+    lines.append("For multiple runs with the same model and scaffold, the mean ± standard deviation is shown.\n")
+    lines.append("")
+    
+    # Table header
+    header = "| Model | " + " | ".join(all_scaffolds) + " |"
+    lines.append(header)
+    separator = "|" + "|".join(["---"] * (len(all_scaffolds) + 1)) + "|"
+    lines.append(separator)
+    
+    # Table rows
+    for model in all_models:
+        row = f"| {model} |"
+        for scaffold in all_scaffolds:
+            cell_value = table_data[model].get(scaffold, "-")
+            row += f" {cell_value} |"
+        lines.append(row)
+    
+    # Add summary statistics
+    lines.append("")
+    lines.append("## Summary Statistics\n")
+    lines.append(f"- Total runs: {len(runs)}")
+    lines.append(f"- Unique models: {len(all_models)}")
+    lines.append(f"- Unique scaffolds: {len(all_scaffolds)}")
+    lines.append("")
+    
+    # List runs with multiple entries
+    multi_run_combinations = [
+        (model, scaffold, len(runs_list))
+        for (model, scaffold), runs_list in grouped.items()
+        if len(runs_list) > 1
+    ]
+    
+    if multi_run_combinations:
+        lines.append("## Multiple Runs (Mean ± StdDev Computed)\n")
+        for model, scaffold, count in sorted(multi_run_combinations):
+            scores = [run.resolve_rate for run in grouped[(model, scaffold)]]
+            mean_score = statistics.mean(scores)
+            stddev_score = statistics.stdev(scores) if len(scores) > 1 else 0.0
+            lines.append(f"- **{model}** on **{scaffold}**: {count} runs → {mean_score:.1%} ± {stddev_score:.1%}")
+        lines.append("")
+    
+    # Write to file
+    output_path = output_dir / "swebench_scores_table.md"
+    output_path.write_text("\n".join(lines))
+    logger.info(f"Generated SWE-bench scores table at {output_path}")
+    
+    return output_path
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="analyzer_config")
 def main(cfg: DictConfig) -> None:
     """Main entry point for trajectory analyzer.
@@ -150,6 +251,12 @@ def main(cfg: DictConfig) -> None:
     
     logger.info(f"Generated {len(generated_plots)} plots in {cfg.output_dir}")
     print(f"\nGenerated {len(generated_plots)} plots in {cfg.output_dir}")
+    
+    # Generate SWE-bench scores table
+    output_dir_path = Path(cfg.output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    table_path = generate_swebench_score_table(runs, output_dir_path)
+    print(f"Generated SWE-bench scores table at {table_path}")
 
 
 if __name__ == "__main__":
