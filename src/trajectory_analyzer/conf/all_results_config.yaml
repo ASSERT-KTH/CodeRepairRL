@@ -24,6 +24,19 @@ plots:
   - transfer_error_modes       # Error mode comparison between scaffolds
   - transfer_vocabulary        # Tool vocabulary alignment and hallucinations
   - transfer_error_patterns    # Raw error message pattern changes
+  - variance_vs_difficulty     # Variance analysis vs difficulty metrics (requires instances)
+  - deep_variance              # Deep variance analysis: mean ± stddev for all metrics across runs
+  - trajectory_dynamics        # Localization accuracy, phases, error recovery
+  - sequence_patterns          # Tool call sequence analysis (bigrams, starts, ends)
+  - failure_taxonomy           # Categorization of why trajectories fail
+
+# Optional: Load SWE-bench instances for difficulty metrics
+# This enables variance analysis correlating difficulty (#files, #lines changed)
+# with resolution rates and variance across runs
+instances:
+  # HuggingFace dataset name (e.g., 'SWE-bench/SWE-bench') or path to JSON/JSONL file
+  source: SWE-bench/SWE-bench_Verified  # Set to dataset name or file path to enable
+  split: test   # Optional: dataset split (e.g., 'test', 'train'). If null, uses default.
 
 # Model to trained scaffold mapping
 model_to_trained_scaffold:
@@ -54,11 +67,83 @@ runs:
     scaffold: "nano-agent"
     lora_adapter: "Qwen3-32B-Nano-SWE-Gym-SFT-Lora"
 
-  # Qwen3-32B base on nano-agent scaffold
-  - name: "qwen32b-nano-agent"
+  # Qwen3-32B base on nano-agent scaffold (10 runs)
+  - name: "qwen32b-nano-agent-run0"
     format: "nano_agent"
-    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/detailed_predictions.jsonl"
-    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/nano-agent-hosted_vllm__Qwen__Qwen3-32B.qwen_32b__nano__500_tool_calls.json"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_0/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_0/nano-agent-hosted_vllm__Qwen__Qwen3-32B.nano-agent-Qwen_Qwen3-32B__run_0__xjoahx74.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  - name: "qwen32b-nano-agent-run1"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_1/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_1/nano-agent-hosted_vllm__Qwen__Qwen3-32B.nano-agent-Qwen_Qwen3-32B__run_1__6syxvqva.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  - name: "qwen32b-nano-agent-run2"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_2/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_2/nano-agent-hosted_vllm__Qwen__Qwen3-32B.nano-agent-Qwen_Qwen3-32B__run_2__6s17jze0.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  - name: "qwen32b-nano-agent-run3"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_3/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_3/nano-agent-hosted_vllm__Qwen__Qwen3-32B.nano-agent-Qwen_Qwen3-32B__run_3__x55a0mtm.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  - name: "qwen32b-nano-agent-run4"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_4/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_4/nano-agent-hosted_vllm__Qwen__Qwen3-32B.nano-agent-Qwen_Qwen3-32B__run_4__xzic6w58.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  - name: "qwen32b-nano-agent-run5"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_5/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_5/nano-agent-hosted_vllm__Qwen__Qwen3-32B.nano-agent-Qwen_Qwen3-32B__run_5__uev8yzz4.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  - name: "qwen32b-nano-agent-run6"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_6/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_6/nano-agent-hosted_vllm__Qwen__Qwen3-32B.nano-agent-Qwen_Qwen3-32B__run_6__u1aqighg.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  - name: "qwen32b-nano-agent-run7"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_7/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_7/nano-agent-hosted_vllm__Qwen__Qwen3-32B.nano-agent-Qwen_Qwen3-32B__run_7__5bmcf95l.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  - name: "qwen32b-nano-agent-run8"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_8/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_8/nano-agent-hosted_vllm__Qwen__Qwen3-32B.nano-agent-Qwen_Qwen3-32B__run_8__2n2j4p7v.json"
+    base_model: "Qwen/Qwen3-32B"
+    scaffold: "nano-agent"
+    lora_adapter: null
+
+  - name: "qwen32b-nano-agent-run9"
+    format: "nano_agent"
+    trajectories: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_9/detailed_predictions.jsonl"
+    results: "/home/andre/Repos/CodeRepairRL-results/nano-agent-Qwen_Qwen3-32B/run_9/nano-agent-hosted_vllm__Qwen__Qwen3-32B.nano-agent-Qwen_Qwen3-32B__run_9__r9xyfb8z.json"
     base_model: "Qwen/Qwen3-32B"
     scaffold: "nano-agent"
     lora_adapter: null

@@ -9,8 +9,11 @@ from typing import Any
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from .loaders import ClaudeCodeLoader, NanoAgentLoader, R2EGymLoader, SWEAgentLoader, TrajectoryLoader
-from .models import Run
+from .loaders import (
+    ClaudeCodeLoader, NanoAgentLoader, R2EGymLoader, SWEAgentLoader, TrajectoryLoader,
+    SWEBenchInstanceLoader,
+)
+from .models import Run, Instance
 from .analysis import MetricsExtractor, RunComparator
 from .plotting import TrajectoryPlotter
 
@@ -136,19 +139,21 @@ def generate_swebench_score_table(runs: list[Run], output_dir: Path) -> Path:
                 score = matching_runs[0].resolve_rate
                 table_data[model][scaffold] = f"{score:.1%}"
             else:
-                # Multiple runs: compute mean ± stddev
+                # Multiple runs: compute mean ± stddev [min-max]
                 scores = [run.resolve_rate for run in matching_runs]
                 mean_score = statistics.mean(scores)
+                min_score = min(scores)
+                max_score = max(scores)
                 if len(scores) > 1:
                     stddev_score = statistics.stdev(scores)
-                    table_data[model][scaffold] = f"{mean_score:.1%} ± {stddev_score:.1%}"
+                    table_data[model][scaffold] = f"{mean_score:.1%} ± {stddev_score:.1%} [{min_score:.1%}-{max_score:.1%}]"
                 else:
                     table_data[model][scaffold] = f"{mean_score:.1%}"
     
     # Generate markdown table
     lines = ["# SWE-bench Scores by Model and Scaffold\n"]
     lines.append("This table shows the resolution rate (SWE-bench score) for each model-scaffold combination.\n")
-    lines.append("For multiple runs with the same model and scaffold, the mean ± standard deviation is shown.\n")
+    lines.append("For multiple runs with the same model and scaffold, the mean ± standard deviation [min-max] is shown.\n")
     lines.append("")
     
     # Table header
@@ -181,12 +186,14 @@ def generate_swebench_score_table(runs: list[Run], output_dir: Path) -> Path:
     ]
     
     if multi_run_combinations:
-        lines.append("## Multiple Runs (Mean ± StdDev Computed)\n")
+        lines.append("## Multiple Runs (Mean ± StdDev [Min-Max] Computed)\n")
         for model, scaffold, count in sorted(multi_run_combinations):
             scores = [run.resolve_rate for run in grouped[(model, scaffold)]]
             mean_score = statistics.mean(scores)
             stddev_score = statistics.stdev(scores) if len(scores) > 1 else 0.0
-            lines.append(f"- **{model}** on **{scaffold}**: {count} runs → {mean_score:.1%} ± {stddev_score:.1%}")
+            min_score = min(scores)
+            max_score = max(scores)
+            lines.append(f"- **{model}** on **{scaffold}**: {count} runs → {mean_score:.1%} ± {stddev_score:.1%} [{min_score:.1%}-{max_score:.1%}]")
         lines.append("")
     
     # Write to file
@@ -227,6 +234,20 @@ def main(cfg: DictConfig) -> None:
         logger.error("No runs loaded. Check your configuration.")
         return
     
+    # Load instances if provided
+    instances: dict[str, Instance] | None = None
+    if cfg.get('instances'):
+        instance_loader = SWEBenchInstanceLoader()
+        try:
+            instances = instance_loader.load_instances(
+                source=cfg.instances.source,
+                split=cfg.instances.get('split'),
+            )
+            logger.info(f"Loaded {len(instances)} instances from {cfg.instances.source}")
+        except Exception as e:
+            logger.warning(f"Failed to load instances: {e}")
+            instances = None
+    
     # Initialize analysis components
     metrics_extractor = MetricsExtractor()
     comparator = RunComparator()
@@ -247,6 +268,7 @@ def main(cfg: DictConfig) -> None:
         runs, 
         plots_to_generate,
         model_to_trained_scaffold=model_to_scaffold,
+        instances=instances,
     )
     
     logger.info(f"Generated {len(generated_plots)} plots in {cfg.output_dir}")
