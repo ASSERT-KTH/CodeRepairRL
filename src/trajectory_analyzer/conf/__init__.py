@@ -1,2 +1,0 @@
-"""Trajectory analyzer configuration package."""
-
