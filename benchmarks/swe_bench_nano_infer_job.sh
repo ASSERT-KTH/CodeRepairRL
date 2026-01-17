@@ -11,58 +11,78 @@
 set -euo pipefail
 
 # Defaults
-BASE_MODEL="Qwen/Qwen3-8B"     # HF model to serve with vLLM
-LORA_PATH=""                    # Optional LoRA path; adapter name auto-derived from basename if set
-MODEL_NAME=""                   # Model name passed to the agent; auto-derived if empty
-SCAFFOLD="nano-agent"           # Scaffold identifier for run tagging
-OUTPUT_BASE_DIR="swe_bench/"
-SUBSET="verified"
-SPLIT="test"
-SLICE=""
-PORT=8000
-SIF="benchmarks/benchmark_container.sif"
-START_SERVER=1
-WANDB_API_KEY=""
+CONFIG_FILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --base-model)
-      BASE_MODEL="${2:?}"; shift 2;;
-    --lora-path)
-      LORA_PATH="${2:?}"; shift 2;;
-    --model-name)
-      MODEL_NAME="${2:?}"; shift 2;;
-    --output-dir)
-      OUTPUT_BASE_DIR="${2:?}"; shift 2;;
-    --subset)
-      SUBSET="${2:?}"; shift 2;;
-    --split)
-      SPLIT="${2:?}"; shift 2;;
-    --slice)
-      SLICE="${2:?}"; shift 2;;
-    --scaffold)
-      SCAFFOLD="${2:?}"; shift 2;;
-    --port)
-      PORT="${2:?}"; shift 2;;
-    --no-server)
-      START_SERVER=0; shift;;
+    --config)
+      CONFIG_FILE="${2:?}"; shift 2;;
     *)
       echo "Unknown arg: $1"; exit 1;;
   esac
 done
 
-# Derive slice and per-task settings when running as a SLURM array
-TASK_ID=${SLURM_ARRAY_TASK_ID:-0}
-SHARD_SIZE=500
-
-# Auto-compute slice if not explicitly provided
-if [[ -z "$SLICE" ]]; then
-  START=$(( TASK_ID * SHARD_SIZE ))
-  END=$(( START + SHARD_SIZE ))
-  SLICE="${START}:${END}"
+if [[ -z "$CONFIG_FILE" ]]; then
+  echo "ERROR: --config is required" >&2
+  echo "Usage: $0 --config benchmarks/configs/nano_qwen3-32b.yaml" >&2
+  exit 1
 fi
 
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "ERROR: Config file not found: $CONFIG_FILE" >&2
+  exit 1
+fi
+
+# Parse config file using Python
+parse_config() {
+  python3 <<EOF
+import yaml
+import sys
+import base64
+
+with open("$CONFIG_FILE", 'r') as f:
+    config = yaml.safe_load(f)
+
+# Extract values
+model_cfg = config.get('model', {})
+vllm_cfg = config.get('vllm', {})
+eval_cfg = config.get('eval', {})
+job_cfg = config.get('job', {})
+endpoint_cfg = config.get('endpoint', {})
+
+# Export as shell variables
+print(f"BASE_MODEL={model_cfg.get('base_model', '')}")
+print(f"LORA_PATH={model_cfg.get('lora_path', '') or ''}")
+print(f"MODEL_NAME={model_cfg.get('model_name', '') or ''}")
+print(f"SCAFFOLD={model_cfg.get('scaffold', 'nano-agent')}")
+print(f"OUTPUT_BASE_DIR={eval_cfg.get('output_base_dir', 'swe_bench/')}")
+print(f"SUBSET={eval_cfg.get('subset', 'verified')}")
+print(f"SPLIT={eval_cfg.get('split', 'test')}")
+print(f"SLICE={eval_cfg.get('slice', '') or ''}")
+print(f"PORT={job_cfg.get('port', 8000)}")
+print(f"MAX_CONTEXT_LEN={vllm_cfg.get('env', {}).get('MAX_CONTEXT_LEN', 65536)}")
+print(f"VLLM_ALLOW_LONG_MAX_MODEL_LEN={vllm_cfg.get('env', {}).get('VLLM_ALLOW_LONG_MAX_MODEL_LEN', 1)}")
+cmd = vllm_cfg.get('command', '')
+cmd_b64 = base64.b64encode(cmd.encode('utf-8')).decode('ascii')
+print(f"VLLM_COMMAND_B64={cmd_b64}")
+print(f"LORA_MAX_RANK={vllm_cfg.get('lora', {}).get('max_rank', 32)}")
+print(f"MODEL_NAME_FORMAT={endpoint_cfg.get('model_name_format', 'hosted_vllm/{MODEL_NAME}')}")
+print(f"START_SERVER={1 if job_cfg.get('start_server', True) else 0}")
+EOF
+}
+
+# Load config values
+eval "$(parse_config)"
+
+# Decode base64-encoded VLLM command
+VLLM_COMMAND=$(echo "$VLLM_COMMAND_B64" | base64 -d)
+
+# Array task ID is used as the run index (for variance measurement with multiple runs)
+# e.g., --array=0-9 gives 10 independent runs stored in run_0/ through run_9/
+TASK_ID=${SLURM_ARRAY_TASK_ID:-0}
+
 # Offset port to avoid conflicts if multiple tasks land on the same node
+# START_SERVER is loaded from config
 if [[ $START_SERVER -eq 1 ]]; then
   PORT=$(( PORT + TASK_ID ))
 fi
@@ -106,7 +126,7 @@ else
 fi
 
 RUN_TAG="${SCAFFOLD}-${MODEL_TAG}"
-OUTPUT_DIR="${OUTPUT_BASE_DIR}/${RUN_TAG}/shard_${TASK_ID}"
+OUTPUT_DIR="${OUTPUT_BASE_DIR}/${RUN_TAG}/run_${TASK_ID}"
 
 mkdir -p "$(dirname "logs/.keep")" "$OUTPUT_DIR"
 
@@ -120,37 +140,30 @@ wait_for_vllm() {
   return 1
 }
 
-# Minimal parser selection based on base model and optional chat template
-RP=""; TP=""; CT=""
-case "${BASE_MODEL,,}" in
-  *qwen*)     RP="--reasoning-parser qwen3"; TP="--tool-call-parser hermes";;
-  *nemotron*) TP="--tool-call-parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
-  *llama*)    TP="--tool-call-parser llama3_json"; CT="--chat-template src/chat_templates/tool_chat_template_llama3.1_json.jinja";;
-  *mistral*)  TP="--tool-call-parser mistral"; CT="--chat-template src/chat_templates/tool_chat_template_mistral.jinja";;
-  *)          TP="--tool-call-parser hermes";;
-esac
+# Export environment variables for vLLM
+export MAX_CONTEXT_LEN
+export VLLM_ALLOW_LONG_MAX_MODEL_LEN
+
+# Build LORA_MODULES string for vLLM command template
+LORA_MODULES_STR=""
+if [[ -n "$LORA_PATH" ]]; then
+  LORA_MODULES_STR="--max-lora-rank $LORA_MAX_RANK --enable-lora --lora-modules \"$LORA_ADAPTER_NAME=$LORA_PATH\""
+fi
+
+# Build vLLM command from template
+VLLM_CMD=$(echo "$VLLM_COMMAND" | \
+  sed "s|{BASE_MODEL}|$BASE_MODEL|g" | \
+  sed "s|{PORT}|$PORT|g" | \
+  sed "s|{MAX_CONTEXT_LEN}|$MAX_CONTEXT_LEN|g" | \
+  sed "s|{LORA_MODULES}|$LORA_MODULES_STR|g")
 
 VLLM_PID=""
-export MAX_CONTEXT_LEN=65536
-export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
 if [[ $START_SERVER -eq 1 ]]; then
   echo "Starting vLLM server on port $PORT for base model '$BASE_MODEL'..."
-  CMD=(uv run vllm serve $BASE_MODEL \
-    --port "$PORT" \
-    --enable-auto-tool-choice \
-    --tensor-parallel-size 8 \
-    --max-model-len $MAX_CONTEXT_LEN \
-    --hf-overrides '{"max_position_embeddings": '$MAX_CONTEXT_LEN'}' \
-    --enable_prefix_caching \
-    $CT \
-    $RP $TP)
-
-  if [[ -n "$LORA_PATH" ]]; then
-    CMD+=(--max-lora-rank 32 --enable-lora --lora-modules "$LORA_ADAPTER_NAME=$LORA_PATH")
-  fi
-
-  # Start server in background and capture PID
-  (exec "${CMD[@]}") > "logs/vllm_${SLURM_JOB_ID:-$$}.log" 2>&1 &
+  echo "Command: $VLLM_CMD"
+  
+  # Execute vLLM command in background
+  eval "$VLLM_CMD" > "logs/vllm_${SLURM_JOB_ID:-$$}.log" 2>&1 &
   VLLM_PID=$!
   trap 'if [[ -n "$VLLM_PID" ]]; then kill "$VLLM_PID" 2>/dev/null || true; fi' EXIT
 
@@ -161,17 +174,25 @@ if [[ $START_SERVER -eq 1 ]]; then
   fi
 fi
 
-echo "Running nano_agent evaluation with model '$MODEL_NAME'..."
+echo "Running nano_agent evaluation (run $TASK_ID) with model '$MODEL_NAME'..."
+
+# Format model name according to config
+FORMATTED_MODEL_NAME=$(echo "$MODEL_NAME_FORMAT" | sed "s|{MODEL_NAME}|$MODEL_NAME|g")
+
+# Build eval command, only include --slice if explicitly provided
+EVAL_CMD=(uv run python benchmarks/swe_bench/run_nano_eval.py \
+  --config "$CONFIG_FILE" \
+  --endpoint "$ENDPOINT" \
+  --model-name "$FORMATTED_MODEL_NAME" \
+  --output-dir "$OUTPUT_DIR")
+
+if [[ -n "$SLICE" ]]; then
+  EVAL_CMD+=(--slice "$SLICE")
+fi
+
 OPENAI_API_BASE="$ENDPOINT" \
 OPENAI_API_KEY="dummy" \
-uv run python benchmarks/swe_bench/run_nano_eval.py \
-  --endpoint "$ENDPOINT" \
-  --model-name "hosted_vllm/$MODEL_NAME" \
-  --output-dir "$OUTPUT_DIR" \
-  --subset "$SUBSET" \
-  --split "$SPLIT" \
-  --slice "$SLICE" \
-  --backend "apptainer"
+"${EVAL_CMD[@]}"
 
 echo "Predictions saved to $OUTPUT_DIR/preds.jsonl"
 
